@@ -1,6 +1,6 @@
 ARG NODE_VERSION=26
 
-FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS frontend-builder
+FROM --platform=linux/amd64 node:${NODE_VERSION}-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
@@ -9,7 +9,7 @@ COPY frontend/ ./
 ENV CLOUD_MODE=true
 RUN npm run build
 
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS backend-builder
+FROM --platform=linux/amd64 golang:1.26-alpine AS backend-builder
 
 WORKDIR /app/backend
 RUN apk add --no-cache git
@@ -17,9 +17,7 @@ COPY backend/ ./
 COPY cli/ /app/cli/
 COPY --from=frontend-builder /app/frontend/build ./static/frontend/
 RUN go mod edit -dropreplace=go.tracewayapp.com -dropreplace=go.tracewayapp.com/tracewaygin && go mod tidy && go mod download
-ARG TARGETOS
-ARG TARGETARCH
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags cloudflare -ldflags="-s -w" -o /traceway ./cmd/traceway
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags cloudflare -ldflags="-s -w" -o /traceway ./cmd/traceway
 
 FROM alpine:3.20
 

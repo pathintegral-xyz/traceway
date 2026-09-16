@@ -3,4 +3,5 @@ node_modules/
 .dev.vars*
 probe-results.json
 runtime/wrangler.jsonc
+runtime/.bootstrap.env
 runtime/worker-configuration.d.ts
