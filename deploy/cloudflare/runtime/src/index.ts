@@ -25,21 +25,8 @@ export class TracewayContainer extends Container {
 		console.error('Traceway container stopped', { exitCode, reason });
 	}
 
-	override async onError(error: unknown) {
-		try {
-			if (!this.ctx.container) {
-				console.error('Traceway container error', { error });
-				return;
-			}
-			const process = await this.ctx.container.exec(['cat', '/tmp/traceway-startup.log']);
-			const output = await process.output();
-			console.error('Traceway container error', {
-				error,
-				startupLog: new TextDecoder().decode(output?.stdout)
-			});
-		} catch (diagnosticError) {
-			console.error('Traceway container error', { error, diagnosticError });
-		}
+	override onError(error: unknown) {
+		console.error('Traceway container error', error);
 	}
 }
 

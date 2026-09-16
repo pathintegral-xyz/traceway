@@ -23,11 +23,9 @@ FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates tzdata
 COPY --from=backend-builder /traceway /usr/local/bin/traceway
-COPY deploy/cloudflare/runtime/entrypoint.sh /usr/local/bin/traceway-entrypoint
-RUN chmod 755 /usr/local/bin/traceway-entrypoint
 USER nobody
 WORKDIR /app
 ENV GIN_MODE=release PORTS=8082 DB_TYPE=sqlite STORAGE_TYPE=s3 CLOUD_MODE=true TRUSTED_PROXY_HEADER=CF-Connecting-IP
 EXPOSE 8082
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 CMD wget -qO- http://localhost:8082/health || exit 1
-ENTRYPOINT ["/usr/local/bin/traceway-entrypoint"]
+ENTRYPOINT ["/usr/local/bin/traceway"]
