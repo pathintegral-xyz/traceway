@@ -106,8 +106,11 @@ func finalizeRowD1(row *models.OutboxDelivery, sendErr error) {
 		})
 		if row.PageNotificationId != nil {
 			statements = append(statements, d1http.Statement{
-				SQL:    "UPDATE page_notifications SET status = 'sent', sent_at = ? WHERE id = ? AND status = 'pending'",
-				Params: []any{now, *row.PageNotificationId},
+				// This follows the guarded outbox update above in the same D1
+				// batch. The EXISTS check makes cancellation win when the send
+				// landed after a concurrent acknowledge or resolve.
+				SQL:    "UPDATE page_notifications SET status = 'sent', sent_at = ? WHERE id = ? AND status = 'pending' AND EXISTS (SELECT 1 FROM notification_outbox WHERE id = ? AND status = 'sent')",
+				Params: []any{now, *row.PageNotificationId, row.Id},
 			})
 		}
 	} else {
@@ -142,8 +145,8 @@ func finalizeTerminalD1(row *models.OutboxDelivery, errorMsg string) {
 	}}
 	if row.PageNotificationId != nil {
 		statements = append(statements, d1http.Statement{
-			SQL:    "UPDATE page_notifications SET status = 'failed', error_msg = ?, sent_at = ? WHERE id = ? AND status = 'pending'",
-			Params: []any{errorMsg, now, *row.PageNotificationId},
+			SQL:    "UPDATE page_notifications SET status = 'failed', error_msg = ?, sent_at = ? WHERE id = ? AND status = 'pending' AND EXISTS (SELECT 1 FROM notification_outbox WHERE id = ? AND status = 'failed')",
+			Params: []any{errorMsg, now, *row.PageNotificationId, row.Id},
 		})
 	}
 	results, err := db.MainD1.Batch(context.Background(), statements)
