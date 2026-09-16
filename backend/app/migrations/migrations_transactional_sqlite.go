@@ -1,4 +1,4 @@
-//go:build !transactional_pg
+//go:build !transactional_pg && !cloudflare
 
 package migrations
 
