@@ -20,6 +20,14 @@ export class TracewayContainer extends Container {
 	sleepAfter = '30m';
 	enableInternet = true;
 	pingEndpoint = '/health';
+
+	override onStop({ exitCode, reason }: { exitCode?: number; reason: string }) {
+		console.error('Traceway container stopped', { exitCode, reason });
+	}
+
+	override onError(error: unknown) {
+		console.error('Traceway container error', error);
+	}
 }
 
 function runtimeEnv(env: Env): Record<string, string> {
