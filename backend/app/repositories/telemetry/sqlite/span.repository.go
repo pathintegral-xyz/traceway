@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/db/d1http"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories/telemetry/shared"
 	"github.com/tracewayapp/traceway/backend/app/repositories/telemetry/sqlitetypes"
@@ -69,6 +70,17 @@ type spanRepository struct{}
 func (r *spanRepository) InsertAsync(ctx context.Context, spans []models.Span) error {
 	if len(spans) == 0 {
 		return nil
+	}
+	if db.IsCloudflare() {
+		statements := make([]d1http.Statement, 0, len(spans))
+		for _, s := range spans {
+			row := spanToRow(s)
+			statements = append(statements, d1http.Statement{
+				SQL: "INSERT INTO spans (id, trace_id, project_id, name, start_time, duration, recorded_at, parent_span_id, attributes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				Params: []any{row.Id, row.TraceId, row.ProjectId, row.Name, row.StartTime, row.Duration, row.RecordedAt, row.ParentSpanId, row.Attributes},
+			})
+		}
+		return db.BatchTelemetry(ctx, statements)
 	}
 
 	tx, err := db.TelemetryDB.BeginTx(ctx, nil)

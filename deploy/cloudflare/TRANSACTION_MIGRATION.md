@@ -11,15 +11,34 @@ This means the Cloudflare migration is a broad but mechanical interface migratio
 1. Keep the SQLite/Postgres repository implementations and their current tests unchanged.
 2. Introduce an execution interface accepted by transactional repositories for ordinary reads and single-statement writes. Both `*sql.DB` and `*sql.Tx` satisfy the native build; `d1http` supplies it in the Cloudflare build.
 3. Compile the Cloudflare request middleware without creating `*sql.Tx`. Routes with only reads or one guarded write then keep their existing controller and repository logic.
-4. Replace each remaining multi-step mutation with one explicit D1 batch. The batch must contain every statement before it is sent.
+4. Replace each remaining multi-step mutation with one explicit D1 batch. The batch must contain every statement before it is sent and must target one D1 database.
 5. Where a mutation decides from a read that cannot be expressed as a guarded update, move only that operation behind a small project-scoped serial command. Keep the caller's Go domain logic and API shape.
 6. Migrate the notification outbox as the first multi-step slice: enqueue intent, claim, cancel, send result, retry, and stale-claim recovery.
+
+## Database boundary
+
+Traceway already separates append-only telemetry from relational application
+state. The Cloudflare target preserves that split with a telemetry D1 and a
+main D1. D1 cannot make one atomic transaction across two databases, so the
+Cloudflare target must not claim a stronger guarantee than the upstream
+application has: report ingestion finishes in telemetry first, then the
+in-process event hook evaluates notification rules and commits delivery intent
+to the main outbox. A crash between those steps may defer that evaluation; it
+must never produce a partially-written telemetry batch or a partially-written
+outbox state transition.
+
+The atomic units are therefore:
+
+- one telemetry D1 batch for each repository write batch;
+- one main D1 batch for each outbox/page state transition or enqueue sequence;
+- an idempotent, at-least-once bridge between telemetry ingestion and rule
+  evaluation, matching the existing asynchronous hook model.
 
 ## Implemented first slice
 
 The Cloudflare build now uses D1 batches for the outbox drain's stale-claim recovery and every finite state transition. A drain reads due rows, then sends a guarded `pending -> sending` batch for each candidate. Only statements whose `changes` value is non-zero own a delivery; competing instances skip the row. Success, retry, and terminal failure transitions are similarly guarded on `sending`; page notification mirrors share the same batch as their outbox transition.
 
-Enqueue and cancellation still participate in their caller's broader transaction and remain migration work. The first remote stage proof must cover event/issue/outbox enqueue atomically before the outbox drain is enabled for a multi-instance stage.
+Enqueue and cancellation still participate in their caller's broader transaction and remain migration work. The first remote stage proof must cover telemetry batch writes, concurrent outbox claim/finalization, and idempotent event-rule evaluation before the outbox drain is enabled for a multi-instance stage.
 
 ## Rules
 

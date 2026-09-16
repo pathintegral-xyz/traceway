@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/db/d1http"
 	"github.com/tracewayapp/traceway/backend/app/models"
 )
 
@@ -143,6 +144,17 @@ type endpointRepository struct{}
 func (e *endpointRepository) InsertAsync(ctx context.Context, lines []models.Endpoint) error {
 	if len(lines) == 0 {
 		return nil
+	}
+	if db.IsCloudflare() {
+		statements := make([]d1http.Statement, 0, len(lines))
+		for _, ep := range lines {
+			row := endpointToRow(ep)
+			statements = append(statements, d1http.Statement{
+				SQL: "INSERT INTO endpoints (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_stream, is_root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				Params: []any{row.Id, row.ProjectId, row.Endpoint, row.Duration, row.RecordedAt, row.StatusCode, row.BodySize, row.ClientIP, row.Attributes, row.AppVersion, row.ServerName, row.DistributedTraceId, row.SpanId, row.IsStream, row.IsRoot},
+			})
+		}
+		return db.BatchTelemetry(ctx, statements)
 	}
 
 	tx, err := db.TelemetryDB.BeginTx(ctx, nil)

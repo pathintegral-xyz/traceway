@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/db/d1http"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories/telemetry/shared"
 )
@@ -37,6 +38,16 @@ func init() {
 func (r *metricPointRepository) InsertAsync(ctx context.Context, points []models.MetricPoint) error {
 	if len(points) == 0 {
 		return nil
+	}
+	if db.IsCloudflare() {
+		statements := make([]d1http.Statement, 0, len(points))
+		for _, p := range points {
+			statements = append(statements, d1http.Statement{
+				SQL:    "INSERT INTO metric_points (project_id, name, value, tags, recorded_at) VALUES (?, ?, ?, ?, ?)",
+				Params: []any{p.ProjectId, p.Name, p.Value, sqlitetypes.NewSQLiteJSONMap(p.Tags), sqlitetypes.NewSQLiteTime(p.RecordedAt)},
+			})
+		}
+		return db.BatchTelemetry(ctx, statements)
 	}
 
 	tx, err := db.TelemetryDB.BeginTx(ctx, nil)

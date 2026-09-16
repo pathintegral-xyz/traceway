@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/db/d1http"
 	"github.com/tracewayapp/traceway/backend/app/models"
 )
 
@@ -97,6 +98,21 @@ func (r *sessionRepository) Upsert(ctx context.Context, sessions []models.Sessio
 			app_version = excluded.app_version,
 			server_name = excluded.server_name,
 			distributed_trace_id = excluded.distributed_trace_id`
+	if db.IsCloudflare() {
+		statements := make([]d1http.Statement, 0, len(sessions))
+		for _, s := range sessions {
+			row := sessionToRow(s)
+			var endedAt any
+			if row.EndedAt != nil {
+				endedAt = *row.EndedAt
+			}
+			statements = append(statements, d1http.Statement{
+				SQL:    stmt,
+				Params: []any{row.Id, row.ProjectId, row.StartedAt, endedAt, row.Duration, row.ClientIP, row.Attributes, row.AppVersion, row.ServerName, row.DistributedTraceId},
+			})
+		}
+		return db.BatchTelemetry(ctx, statements)
+	}
 
 	tx, err := db.TelemetryDB.BeginTx(ctx, nil)
 	if err != nil {

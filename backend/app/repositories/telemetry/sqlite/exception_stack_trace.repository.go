@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/db/d1http"
 	"github.com/tracewayapp/traceway/backend/app/models"
 )
 
@@ -109,6 +110,17 @@ type exceptionStackTraceRepository struct{}
 func (e *exceptionStackTraceRepository) InsertAsync(ctx context.Context, lines []models.ExceptionStackTrace) error {
 	if len(lines) == 0 {
 		return nil
+	}
+	if db.IsCloudflare() {
+		statements := make([]d1http.Statement, 0, len(lines))
+		for _, est := range lines {
+			row := exceptionToRow(est)
+			statements = append(statements, d1http.Statement{
+				SQL: "INSERT INTO exception_stack_traces (id, project_id, trace_id, trace_type, exception_hash, stack_trace, recorded_at, attributes, app_version, server_name, is_message, distributed_trace_id, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				Params: []any{row.Id, row.ProjectId, row.TraceId, row.TraceType, row.ExceptionHash, row.StackTrace, row.RecordedAt, row.Attributes, row.AppVersion, row.ServerName, row.IsMessage, row.DistributedTraceId, row.SessionId},
+			})
+		}
+		return db.BatchTelemetry(ctx, statements)
 	}
 
 	tx, err := db.TelemetryDB.BeginTx(ctx, nil)
