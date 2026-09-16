@@ -9,6 +9,7 @@ import (
 	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/config"
 	"github.com/tracewayapp/traceway/backend/app/db/d1http"
+	"github.com/google/uuid"
 )
 
 // MainD1 and TelemetryD1 expose D1's explicit batch operation to the small
@@ -61,4 +62,11 @@ func openD1(databaseID string) (*sql.DB, *d1http.Connector, error) {
 		return nil, nil, err
 	}
 	return database, connector, nil
+}
+
+// The SQLite deployment already invalidates only its local in-memory cache.
+// Cloudflare's cross-instance invalidation is handled separately from the D1
+// transaction path, so project writes must retain the same no-op contract here.
+func NotifyProjectCacheChanged(*sql.Tx, uuid.UUID) error {
+	return nil
 }

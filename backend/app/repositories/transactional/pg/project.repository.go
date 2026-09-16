@@ -123,9 +123,9 @@ func (p *projectRepository) GetEffectiveRole(tx *sql.Tx, projectId uuid.UUID, us
 	return effectiveRole(row.OrgRole, row.OverrideRole), nil
 }
 
-func (p *projectRepository) FindAll(tx *sql.Tx) ([]*models.Project, error) {
+func (p *projectRepository) FindAll(executor lit.Executor) ([]*models.Project, error) {
 	return lit.Select[models.Project](
-		tx,
+		executor,
 		"SELECT id, name, token, framework, organization_id, created_at, source_map_token, drop_healthy_healthchecks, healthcheck_paths, profile_label_allowlist, ai_flagged_terms, ai_flagged_languages FROM projects ORDER BY created_at ASC",
 	)
 }

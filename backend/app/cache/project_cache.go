@@ -41,9 +41,15 @@ func (c *projectCache) Refresh(ctx context.Context) error {
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
-	projects, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
-		return transactional.ProjectRepository.FindAll(tx)
-	})
+	var projects []*models.Project
+	var err error
+	if db.IsCloudflare() {
+		projects, err = transactional.ProjectRepository.FindAll(db.DB)
+	} else {
+		projects, err = db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
+			return transactional.ProjectRepository.FindAll(tx)
+		})
+	}
 	if err != nil {
 		return err
 	}
