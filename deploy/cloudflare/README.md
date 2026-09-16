@@ -6,7 +6,9 @@
 
 The Cloudflare Integration workflow checks build-identity handling for source maps on every pull request into `cloudflare`. `npm test` in this directory is the local workerd/D1 compatibility baseline: it applies both upstream SQLite migration streams and checks the D1 batch boundary. It is not evidence that the current Go database layer can use D1.
 
-The stage deployment will follow a successful merge once the Cloudflare persistence and queue implementation is complete. Production promotes the stage-verified immutable Worker version and container image digest; it does not rebuild from the branch.
+`.github/workflows/cloudflare-deploy.yml` deploys Stage automatically from `cloudflare`. Production is manual-only: select `prod` and provide a full commit SHA already reachable from `cloudflare`. Protect the GitHub `production` Environment with required reviewers; the workflow rebuilds that exact commit against the distinct production bindings.
+
+Both GitHub Environments (`stage` and `production`) require these Variables: `CLOUDFLARE_ACCOUNT_ID`, `TRACEWAY_WORKER_NAME`, `TRACEWAY_MAIN_D1_DATABASE_ID`, `TRACEWAY_TELEMETRY_D1_DATABASE_ID`, `TRACEWAY_R2_BUCKET`, and `TRACEWAY_APP_BASE_URL`. They require these Secrets: `CLOUDFLARE_API_TOKEN`, `TRACEWAY_JWT_SECRET`, `TRACEWAY_D1_API_TOKEN`, `TRACEWAY_R2_ACCESS_KEY`, and `TRACEWAY_R2_SECRET_KEY`. The deployment job generates an untracked Wrangler configuration from those values and updates only its target Worker's four runtime secrets.
 
 ## Release sequence
 

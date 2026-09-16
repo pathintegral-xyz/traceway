@@ -1,0 +1,139 @@
+name: Deploy Traceway to Cloudflare
+
+on:
+  push:
+    branches: [cloudflare]
+    paths:
+      - ".nvmrc"
+      - "backend/**"
+      - "cli/**"
+      - "frontend/**"
+      - "deploy/cloudflare/**"
+      - ".github/workflows/cloudflare-deploy.yml"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment target
+        required: true
+        type: choice
+        options: [stage, prod]
+        default: stage
+      ref:
+        description: Immutable cloudflare commit SHA to deploy (required for prod)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-stage:
+    if: github.event_name == 'push' || inputs.target == 'stage'
+    name: Deploy Stage
+    runs-on: ubuntu-latest
+    environment: stage
+    concurrency:
+      group: traceway-cloudflare-stage
+      cancel-in-progress: true
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      TRACEWAY_WORKER_NAME: ${{ vars.TRACEWAY_WORKER_NAME }}
+      TRACEWAY_MAIN_D1_DATABASE_ID: ${{ vars.TRACEWAY_MAIN_D1_DATABASE_ID }}
+      TRACEWAY_TELEMETRY_D1_DATABASE_ID: ${{ vars.TRACEWAY_TELEMETRY_D1_DATABASE_ID }}
+      TRACEWAY_R2_BUCKET: ${{ vars.TRACEWAY_R2_BUCKET }}
+      TRACEWAY_APP_BASE_URL: ${{ vars.TRACEWAY_APP_BASE_URL }}
+      JWT_SECRET: ${{ secrets.TRACEWAY_JWT_SECRET }}
+      CLOUDFLARE_D1_API_TOKEN: ${{ secrets.TRACEWAY_D1_API_TOKEN }}
+      S3_ACCESS_KEY: ${{ secrets.TRACEWAY_R2_ACCESS_KEY }}
+      S3_SECRET_KEY: ${{ secrets.TRACEWAY_R2_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: deploy/cloudflare/package-lock.json
+      - name: Install deployment tooling
+        working-directory: deploy/cloudflare
+        run: npm ci
+      - name: Validate D1 compatibility baseline
+        working-directory: deploy/cloudflare
+        run: npm test
+      - name: Generate Stage Worker configuration
+        working-directory: deploy/cloudflare
+        run: node scripts/write-wrangler-config.mjs
+      - name: Deploy Stage Worker and Container
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.132.0"
+          workingDirectory: deploy/cloudflare
+          command: deploy --config runtime/wrangler.generated.jsonc
+          secrets: |
+            JWT_SECRET
+            CLOUDFLARE_D1_API_TOKEN
+            S3_ACCESS_KEY
+            S3_SECRET_KEY
+      - name: Deployment summary
+        run: echo "Stage deployed from $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-prod:
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'prod' && inputs.ref != ''
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: traceway-cloudflare-production
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      TRACEWAY_WORKER_NAME: ${{ vars.TRACEWAY_WORKER_NAME }}
+      TRACEWAY_MAIN_D1_DATABASE_ID: ${{ vars.TRACEWAY_MAIN_D1_DATABASE_ID }}
+      TRACEWAY_TELEMETRY_D1_DATABASE_ID: ${{ vars.TRACEWAY_TELEMETRY_D1_DATABASE_ID }}
+      TRACEWAY_R2_BUCKET: ${{ vars.TRACEWAY_R2_BUCKET }}
+      TRACEWAY_APP_BASE_URL: ${{ vars.TRACEWAY_APP_BASE_URL }}
+      JWT_SECRET: ${{ secrets.TRACEWAY_JWT_SECRET }}
+      CLOUDFLARE_D1_API_TOKEN: ${{ secrets.TRACEWAY_D1_API_TOKEN }}
+      S3_ACCESS_KEY: ${{ secrets.TRACEWAY_R2_ACCESS_KEY }}
+      S3_SECRET_KEY: ${{ secrets.TRACEWAY_R2_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Require a cloudflare integration commit
+        run: |
+          git fetch origin cloudflare
+          git merge-base --is-ancestor HEAD origin/cloudflare
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: deploy/cloudflare/package-lock.json
+      - name: Install deployment tooling
+        working-directory: deploy/cloudflare
+        run: npm ci
+      - name: Validate D1 compatibility baseline
+        working-directory: deploy/cloudflare
+        run: npm test
+      - name: Generate Production Worker configuration
+        working-directory: deploy/cloudflare
+        run: node scripts/write-wrangler-config.mjs
+      - name: Deploy Production Worker and Container
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.132.0"
+          workingDirectory: deploy/cloudflare
+          command: deploy --config runtime/wrangler.generated.jsonc
+          secrets: |
+            JWT_SECRET
+            CLOUDFLARE_D1_API_TOKEN
+            S3_ACCESS_KEY
+            S3_SECRET_KEY
+      - name: Deployment summary
+        run: echo "Production deployed from immutable commit ${{ inputs.ref }}." >> "$GITHUB_STEP_SUMMARY"
