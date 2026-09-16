@@ -53,10 +53,18 @@ function runtimeEnv(env: Env): Record<string, string> {
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const container = await getRandom(env.TRACEWAY);
-		await container.startAndWaitForPorts({
-			ports: [8082],
-			startOptions: { envVars: runtimeEnv(env) }
-		});
+		try {
+			await container.startAndWaitForPorts({
+				ports: [8082],
+				startOptions: { envVars: runtimeEnv(env) }
+			});
+		} catch (error) {
+			console.error('Traceway container failed to start', {
+				error: error instanceof Error ? error.message : String(error),
+				state: await container.getState()
+			});
+			return new Response('Traceway is starting', { status: 503 });
+		}
 		return container.fetch(request);
 	}
 };
