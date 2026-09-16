@@ -20,6 +20,11 @@ type Cfg struct {
 	PostgresSSLMode  string
 	SQLitePath       string
 
+	CloudflareAccountID             string
+	CloudflareD1MainDatabaseID      string
+	CloudflareD1TelemetryDatabaseID string
+	CloudflareD1APIToken            string
+
 	DuckDBMemoryLimit         string
 	DuckDBThreads             string
 	DuckDBCheckpointThreshold string
@@ -213,6 +218,11 @@ func LoadFromEnv() *Cfg {
 		PostgresPassword: os.Getenv("POSTGRES_PASSWORD"),
 		PostgresSSLMode:  os.Getenv("POSTGRES_SSLMODE"),
 		SQLitePath:       os.Getenv("SQLITE_PATH"),
+
+		CloudflareAccountID:             os.Getenv("CLOUDFLARE_ACCOUNT_ID"),
+		CloudflareD1MainDatabaseID:      os.Getenv("CLOUDFLARE_D1_MAIN_DATABASE_ID"),
+		CloudflareD1TelemetryDatabaseID: os.Getenv("CLOUDFLARE_D1_TELEMETRY_DATABASE_ID"),
+		CloudflareD1APIToken:            os.Getenv("CLOUDFLARE_D1_API_TOKEN"),
 
 		DuckDBMemoryLimit:         os.Getenv("DUCKDB_MEMORY_LIMIT"),
 		DuckDBThreads:             os.Getenv("DUCKDB_THREADS"),

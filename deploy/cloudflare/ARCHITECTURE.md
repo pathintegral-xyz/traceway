@@ -21,11 +21,13 @@ Traceway's existing S3 storage implementation -> R2
 
 There is no runtime SQLite file, WAL file, or R2 database-copy loop. Every Container connects to the same stage or production D1 databases through a least-privilege API token held as a Cloudflare secret.
 
+The Cloudflare build (`-tags cloudflare`) reads `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_MAIN_DATABASE_ID`, `CLOUDFLARE_D1_TELEMETRY_DATABASE_ID`, and `CLOUDFLARE_D1_API_TOKEN`. It opens both D1 databases through the same direct HTTPS client. Stage and production use distinct database IDs and scoped server-only secrets; they may share one Cloudflare account.
+
 ## Compatibility boundary
 
 `backend/app/db/d1http` implements ordinary `database/sql` queries and writes over D1's HTTPS `/raw` endpoint. The raw endpoint returns ordered columns and rows, preserving the `database/sql.Rows` contract without parsing SQL in the driver.
 
-The driver deliberately rejects `Begin` and `BeginTx`. D1 has atomic batches, but does not expose the open interactive transaction required by the current `*sql.Tx` contract. This makes every remaining transaction dependency visible instead of silently weakening consistency.
+The driver deliberately rejects `Begin` and `BeginTx`. Its exported `Connector.Batch` submits a known finite statement set through D1's atomic `{ batch: [...] }` API. D1 does not expose the open interactive transaction required by the current `*sql.Tx` contract. This makes every remaining transaction dependency visible instead of silently weakening consistency.
 
 ## Migration order
 
