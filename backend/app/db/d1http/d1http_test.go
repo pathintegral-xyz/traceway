@@ -93,3 +93,23 @@ func TestTransactionIsExplicitlyRejected(t *testing.T) {
 		t.Fatalf("expected ErrTransactionsUnsupported, got %v", err)
 	}
 }
+
+func TestPingUsesD1(t *testing.T) {
+	db := newTestDB(t, func(w http.ResponseWriter, r *http.Request) {
+		var request queryRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if request.SQL != "SELECT 1" {
+			t.Fatalf("ping query = %q", request.SQL)
+		}
+		response(w, map[string]any{
+			"success": true,
+			"meta":    map[string]any{"changes": 0, "last_row_id": "0"},
+			"results": map[string]any{"columns": []string{"1"}, "rows": [][]any{{1}}},
+		})
+	})
+	if err := db.PingContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}

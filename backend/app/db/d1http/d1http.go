@@ -81,7 +81,10 @@ type conn struct{ connector *Connector }
 func (c *conn) Prepare(query string) (driver.Stmt, error) { return &stmt{conn: c, query: query}, nil }
 func (c *conn) Close() error                              { return nil }
 func (c *conn) Begin() (driver.Tx, error)                 { return nil, ErrTransactionsUnsupported }
-func (c *conn) Ping(context.Context) error                { return nil }
+func (c *conn) Ping(ctx context.Context) error {
+	_, err := c.query(ctx, "SELECT 1", nil)
+	return err
+}
 
 func (c *conn) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error) {
 	return nil, ErrTransactionsUnsupported
