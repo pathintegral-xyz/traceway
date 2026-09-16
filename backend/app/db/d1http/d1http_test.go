@@ -113,3 +113,39 @@ func TestPingUsesD1(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestBatchSendsFiniteAtomicWriteSet(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request batchRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if len(request.Batch) != 2 || request.Batch[0].SQL != "INSERT INTO events (id) VALUES (?)" || request.Batch[1].SQL != "INSERT INTO notification_outbox (event_id) VALUES (?)" {
+			t.Fatalf("unexpected batch: %#v", request)
+		}
+		if request.Batch[0].Params[0] != "event-1" || request.Batch[1].Params[0] != "event-1" {
+			t.Fatalf("unexpected batch params: %#v", request.Batch)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "result": []any{
+			map[string]any{"success": true, "meta": map[string]any{"changes": 1, "last_row_id": "41"}, "results": map[string]any{"columns": []string{}, "rows": [][]any{}}},
+			map[string]any{"success": true, "meta": map[string]any{"changes": 1, "last_row_id": "42"}, "results": map[string]any{"columns": []string{}, "rows": [][]any{}}},
+		}})
+	}))
+	defer server.Close()
+
+	connector, err := NewConnector(Config{AccountID: "account", DatabaseID: "database", APIToken: "token", Endpoint: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := connector.Batch(context.Background(), []Statement{
+		{SQL: "INSERT INTO events (id) VALUES (?)", Params: []any{"event-1"}},
+		{SQL: "INSERT INTO notification_outbox (event_id) VALUES (?)", Params: []any{"event-1"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 || results[0].LastInsertID != 41 || results[1].LastInsertID != 42 {
+		t.Fatalf("unexpected results: %#v", results)
+	}
+}

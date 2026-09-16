@@ -31,6 +31,20 @@ type Config struct {
 	Endpoint   string
 }
 
+// Statement is one SQL operation in an atomic D1 batch. Callers must provide
+// the complete write set before invoking Batch; this is intentionally not an
+// interactive transaction API.
+type Statement struct {
+	SQL    string
+	Params []any
+}
+
+// BatchResult contains write metadata for one statement in a Batch result.
+type BatchResult struct {
+	Changes      int64
+	LastInsertID int64
+}
+
 func Open(cfg Config) (*sql.DB, error) {
 	connector, err := NewConnector(cfg)
 	if err != nil {
@@ -62,6 +76,40 @@ type Connector struct {
 	endpoint string
 	token    string
 	client   *http.Client
+}
+
+// Batch executes all statements in one atomic D1 batch. It is the Cloudflare
+// replacement for a known, finite multi-statement mutation.
+func (c *Connector) Batch(ctx context.Context, statements []Statement) ([]BatchResult, error) {
+	if len(statements) == 0 {
+		return nil, nil
+	}
+	batch := make([]queryRequest, len(statements))
+	for i, statement := range statements {
+		if statement.SQL == "" {
+			return nil, fmt.Errorf("d1http: batch statement %d has empty SQL", i)
+		}
+		params, err := normalizeParams(statement.Params)
+		if err != nil {
+			return nil, fmt.Errorf("d1http: batch statement %d: %w", i, err)
+		}
+		batch[i] = queryRequest{SQL: statement.SQL, Params: params}
+	}
+	payload, err := c.request(ctx, batchRequest{Batch: batch})
+	if err != nil {
+		return nil, err
+	}
+	if len(payload.Result) != len(batch) {
+		return nil, apiError{status: http.StatusOK, messages: "D1 returned an incomplete batch result"}
+	}
+	results := make([]BatchResult, len(payload.Result))
+	for i, result := range payload.Result {
+		if !result.Success {
+			return nil, apiError{status: http.StatusOK, messages: fmt.Sprintf("D1 rejected batch statement %d", i)}
+		}
+		results[i] = BatchResult{Changes: result.Meta.Changes, LastInsertID: result.lastRowID()}
+	}
+	return results, nil
 }
 
 func (c *Connector) Connect(context.Context) (driver.Conn, error) {
@@ -134,33 +182,57 @@ func (c *conn) query(ctx context.Context, query string, args []driver.NamedValue
 		}
 		params[i] = arg.Value
 	}
-	body, err := json.Marshal(queryRequest{SQL: query, Params: params})
-	if err != nil {
-		return queryResult{}, fmt.Errorf("d1http: encode query: %w", err)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.connector.endpoint, bytes.NewReader(body))
+	payload, err := c.connector.request(ctx, queryRequest{SQL: query, Params: params})
 	if err != nil {
 		return queryResult{}, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.connector.token)
-	req.Header.Set("Content-Type", "application/json")
-	response, err := c.connector.client.Do(req)
+	if len(payload.Result) != 1 || !payload.Result[0].Success {
+		return queryResult{}, apiError{status: http.StatusOK, messages: "D1 rejected query"}
+	}
+	return payload.Result[0], nil
+}
+
+func (c *Connector) request(ctx context.Context, bodyValue any) (apiResponse, error) {
+	body, err := json.Marshal(bodyValue)
 	if err != nil {
-		return queryResult{}, fmt.Errorf("d1http: request: %w", err)
+		return apiResponse{}, fmt.Errorf("d1http: encode query: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
+	if err != nil {
+		return apiResponse{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	response, err := c.client.Do(req)
+	if err != nil {
+		return apiResponse{}, fmt.Errorf("d1http: request: %w", err)
 	}
 	defer response.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
 	if err != nil {
-		return queryResult{}, fmt.Errorf("d1http: read response: %w", err)
+		return apiResponse{}, fmt.Errorf("d1http: read response: %w", err)
 	}
 	var payload apiResponse
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return queryResult{}, fmt.Errorf("d1http: decode response: %w", err)
+		return apiResponse{}, fmt.Errorf("d1http: decode response: %w", err)
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 || !payload.Success || len(payload.Result) != 1 || !payload.Result[0].Success {
-		return queryResult{}, apiError{status: response.StatusCode, messages: payload.errorMessages()}
+	if response.StatusCode < 200 || response.StatusCode >= 300 || !payload.Success {
+		return apiResponse{}, apiError{status: response.StatusCode, messages: payload.errorMessages()}
 	}
-	return payload.Result[0], nil
+	return payload, nil
+}
+
+func normalizeParams(params []any) ([]driver.Value, error) {
+	values := make([]driver.Value, len(params))
+	checker := conn{}
+	for i, param := range params {
+		named := driver.NamedValue{Ordinal: i + 1, Value: param}
+		if err := checker.CheckNamedValue(&named); err != nil {
+			return nil, err
+		}
+		values[i] = named.Value
+	}
+	return values, nil
 }
 
 type stmt struct {
@@ -241,6 +313,10 @@ func (r d1Result) RowsAffected() (int64, error) { return r.changes, nil }
 type queryRequest struct {
 	SQL    string         `json:"sql"`
 	Params []driver.Value `json:"params,omitempty"`
+}
+
+type batchRequest struct {
+	Batch []queryRequest `json:"batch"`
 }
 
 type apiResponse struct {
