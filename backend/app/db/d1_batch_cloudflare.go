@@ -16,3 +16,10 @@ func BatchTelemetry(ctx context.Context, statements []d1http.Statement) error {
 	_, err := TelemetryD1.Batch(ctx, statements)
 	return err
 }
+
+func BatchMain(ctx context.Context, statements []d1http.Statement) ([]d1http.BatchResult, error) {
+	if MainD1 == nil {
+		return nil, fmt.Errorf("Cloudflare main D1 batch connector is not initialized")
+	}
+	return MainD1.Batch(ctx, statements)
+}

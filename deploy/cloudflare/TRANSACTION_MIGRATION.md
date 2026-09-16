@@ -46,3 +46,32 @@ Enqueue and cancellation still participate in their caller's broader transaction
 - Do not send a database API token to browsers. It is stored only as a stage/prod Container secret.
 - Do not add an HTTP SQL gateway. Go Containers use D1's HTTPS API directly.
 - Keep every Cloudflare-only implementation behind the `cloudflare` build tag; upstream SQLite and PostgreSQL paths remain untouched.
+
+## Central adaptation boundary
+
+The migration must not add `if db.IsCloudflare()` branches to controllers, and
+must not make `d1http` manufacture a fake `*sql.Tx`. A `*sql.Tx` permits
+interactive reads whose results decide later writes; D1 batch requests require
+the complete statement set before execution. Pretending otherwise would turn
+atomic flows into silent autocommit sequences.
+
+The permanent boundary is therefore a command layer:
+
+1. Controllers call a domain command such as `Register`, `CreateProject`, or
+   `AcceptInvitation`.
+2. The native command implementation runs the existing repository calls in a
+   SQLite/Postgres transaction.
+3. The Cloudflare command implementation validates the request, builds one
+   `db.BatchMain` statement set, and sends it atomically to one D1 database.
+4. Shared read repositories accept `lit.Executor`, so ordinary reads are
+   reused by both implementations without a transaction wrapper.
+
+This keeps the deployment distinction in one package per domain command rather
+than spreading it through routes and controllers. Every remaining
+`middleware.Transactional` route is migrated to a command before Cloudflare
+traffic is enabled for it; the Cloudflare middleware must never call `Begin`.
+
+The implementation order is authentication and setup first (register, login,
+OAuth setup, invitations), then organization/project mutations, dashboards,
+notifications, and synthetics. Background work uses the same command boundary
+and guarded batches.

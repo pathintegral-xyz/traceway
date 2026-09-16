@@ -12,3 +12,7 @@ import (
 func BatchTelemetry(context.Context, []d1http.Statement) error {
 	return fmt.Errorf("Cloudflare telemetry D1 batches are unavailable in this build")
 }
+
+func BatchMain(context.Context, []d1http.Statement) ([]d1http.BatchResult, error) {
+	return nil, fmt.Errorf("Cloudflare main D1 batches are unavailable in this build")
+}
