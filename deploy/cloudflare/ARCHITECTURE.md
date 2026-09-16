@@ -31,7 +31,7 @@ The driver deliberately rejects `Begin` and `BeginTx`. D1 has atomic batches, bu
 
 1. Run the upstream `sqlite` and `sqlite_telemetry` migrations against separate stage D1 databases.
 2. Use `d1http` for non-transactional repository reads and writes, preserving their SQL and call sites.
-3. Convert only transaction hotspots to explicit D1 batches or guarded single-statement updates, starting with event grouping and notification outbox state transitions.
+3. Mechanically migrate transactional repository signatures to a shared execution interface, then convert remaining multi-step mutations to explicit D1 batches or guarded single-statement updates. The detailed inventory is in [TRANSACTION_MIGRATION.md](TRANSACTION_MIGRATION.md).
 4. Trigger existing Go background functions from Cloudflare Cron or Queues instead of allowing every Container to poll.
 5. Run the same commit against stage, then promote its immutable Container image and migration level to production.
 
