@@ -178,7 +178,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 
 	// Keep the limiter before Transactional so rejected requests don't open a transaction.
 	router.POST("/login", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.Transactional, AuthController.Login)
-	router.POST("/register", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.Transactional, AuthController.Register)
+	router.POST("/register", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.TransactionalCommand, AuthController.Register)
 	router.GET("/me/login-bundle", middleware.UseAppAuth, middleware.Transactional, AuthController.LoginBundle)
 
 	router.GET("/auth/providers", OAuthController.ListProviders)

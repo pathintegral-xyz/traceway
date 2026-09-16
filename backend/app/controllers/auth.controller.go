@@ -107,6 +107,11 @@ func (a authController) Register(c *gin.Context) {
 		}
 	}
 
+	if db.IsCloudflare() {
+		a.registerCloudflare(c, request)
+		return
+	}
+
 	tx := db.GetTx(c)
 
 	// if we're not in the cloud mode only a single organization is allowed

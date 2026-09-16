@@ -57,7 +57,7 @@ func effectiveRole(orgRole string, overrideRole *string) string {
 	return orgRole
 }
 
-func (p *projectRepository) FindAllWithBackendUrlByUserId(tx *sql.Tx, userId int) ([]*models.ProjectWithBackendUrl, error) {
+func (p *projectRepository) FindAllWithBackendUrlByUserId(tx lit.Executor, userId int) ([]*models.ProjectWithBackendUrl, error) {
 	rows, err := lit.SelectNamed[projectWithRole](
 		tx,
 		`SELECT DISTINCT p.id, p.name, p.token, p.framework, p.organization_id, p.created_at, p.source_map_token, p.drop_healthy_healthchecks, p.healthcheck_paths, p.profile_label_allowlist, p.ai_flagged_terms, p.ai_flagged_languages, ou.role, pur.role as override_role

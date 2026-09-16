@@ -186,7 +186,7 @@ func (r *organizationRepository) IsUserMemberByEmail(tx *sql.Tx, organizationId 
 	return result.Count > 0, nil
 }
 
-func (r *organizationRepository) FindByUserIdWithRoles(tx *sql.Tx, userId int) ([]*models.UserOrganizationResponse, error) {
+func (r *organizationRepository) FindByUserIdWithRoles(tx lit.Executor, userId int) ([]*models.UserOrganizationResponse, error) {
 	return lit.SelectNamed[models.UserOrganizationResponse](
 		tx,
 		`SELECT o.id, o.name, ou.role, o.timezone

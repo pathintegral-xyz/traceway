@@ -46,6 +46,20 @@ func Transactional(c *gin.Context) {
 	}
 }
 
+// TransactionalCommand preserves the native transaction contract while a
+// command has a Cloudflare D1 batch implementation. It must only wrap routes
+// whose controller selects that implementation when db.IsCloudflare is true.
+func TransactionalCommand(c *gin.Context) {
+	if db.IsCloudflare() {
+		if !bufferRequestBody(c, maxTransactionalBodyBytes) {
+			return
+		}
+		c.Next()
+		return
+	}
+	Transactional(c)
+}
+
 const commitHooksContextKey = "txCommitHooks"
 
 // OnCommit queues fn to run after the Transactional middleware successfully

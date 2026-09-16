@@ -16,7 +16,7 @@ type userRepository struct{}
 
 const userColumns = "id, email, name, password, created_at, oauth_provider, oauth_user_id, avatar_url"
 
-func (r *userRepository) FindByEmail(tx *sql.Tx, email string) (*models.User, error) {
+func (r *userRepository) FindByEmail(tx lit.Executor, email string) (*models.User, error) {
 	return lit.SelectSingleNamed[models.User](
 		tx,
 		"SELECT "+userColumns+" FROM users WHERE email = :email",
@@ -113,7 +113,7 @@ func nullIfEmpty(s string) any {
 	return s
 }
 
-func (r *userRepository) EmailExists(tx *sql.Tx, email string) (bool, error) {
+func (r *userRepository) EmailExists(tx lit.Executor, email string) (bool, error) {
 	user, err := r.FindByEmail(tx, email)
 	if err != nil {
 		return false, err

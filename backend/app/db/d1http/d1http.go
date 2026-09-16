@@ -276,7 +276,7 @@ func (r *rows) Next(dest []driver.Value) error {
 		return io.EOF
 	}
 	for i, value := range r.values[r.index] {
-		converted, err := toDriverValue(value)
+		converted, err := toDriverValue(value, r.columns[i])
 		if err != nil {
 			return err
 		}
@@ -286,11 +286,19 @@ func (r *rows) Next(dest []driver.Value) error {
 	return nil
 }
 
-func toDriverValue(value any) (driver.Value, error) {
+func toDriverValue(value any, column string) (driver.Value, error) {
 	switch typed := value.(type) {
 	case nil:
 		return nil, nil
-	case string, bool, float64:
+	case string:
+		if isTimestampColumn(column) {
+			timestamp, ok := parseTimestamp(typed)
+			if ok {
+				return timestamp, nil
+			}
+		}
+		return typed, nil
+	case bool, float64:
 		return typed, nil
 	case json.Number:
 		if integer, err := typed.Int64(); err == nil {
@@ -300,6 +308,23 @@ func toDriverValue(value any) (driver.Value, error) {
 	default:
 		return nil, fmt.Errorf("d1http: unsupported D1 value %T", value)
 	}
+}
+
+func isTimestampColumn(column string) bool {
+	return strings.HasSuffix(strings.ToLower(column), "_at") || strings.HasSuffix(strings.ToLower(column), "_time")
+}
+
+// D1's HTTP API returns SQLite DATETIME values as strings. database/sql only
+// scans time.Time from a time.Time driver value, so normalize timestamp
+// columns in the two formats produced by this application and SQLite's
+// datetime('now').
+func parseTimestamp(value string) (time.Time, bool) {
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05.999999999", "2006-01-02 15:04:05"} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed, true
+		}
+	}
+	return time.Time{}, false
 }
 
 type d1Result struct {
