@@ -177,7 +177,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.POST("/exception-stack-traces/:hash", middleware.UseAppAuth, middleware.RequireProjectAccess, ExceptionStackTraceController.FindByHash)
 
 	// Keep the limiter before Transactional so rejected requests don't open a transaction.
-	router.POST("/login", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.Transactional, AuthController.Login)
+	router.POST("/login", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.TransactionalCommand, AuthController.Login)
 	router.POST("/register", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.TransactionalCommand, AuthController.Register)
 	router.GET("/me/login-bundle", middleware.UseAppAuth, middleware.Transactional, AuthController.LoginBundle)
 

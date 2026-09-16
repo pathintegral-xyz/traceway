@@ -18,6 +18,37 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/services/contentflag"
 )
 
+func (a authController) loginCloudflare(c *gin.Context, request models.LoginRequest) {
+	user, err := transactional.UserRepository.FindByEmail(db.DB, request.Email)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	if user == nil || !services.CheckPassword(request.Password, user.Password) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	token, err := services.GenerateToken(user.Id, user.Email)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	projects, err := transactional.ProjectRepository.FindAllWithBackendUrlByUserId(db.DB, user.Id)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	organizations, err := transactional.OrganizationRepository.FindByUserIdWithRoles(db.DB, user.Id)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, &models.LoginResponse{
+		Token: token, User: user.ToResponse(), Projects: projects, Organizations: organizations,
+	})
+}
+
 // registerCloudflare is the finite D1 equivalent of the native registration
 // transaction. D1 batches execute the whole write set atomically, while reads
 // after the batch use the normal database/sql connector.

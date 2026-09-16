@@ -45,6 +45,11 @@ func (a authController) Login(c *gin.Context) {
 		return
 	}
 
+	if db.IsCloudflare() {
+		a.loginCloudflare(c, request)
+		return
+	}
+
 	tx := db.GetTx(c)
 
 	user, err := transactional.UserRepository.FindByEmail(tx, request.Email)
