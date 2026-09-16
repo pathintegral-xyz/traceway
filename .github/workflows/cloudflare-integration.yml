@@ -23,6 +23,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  d1-compatibility:
+    name: D1 migration compatibility
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/cloudflare
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: deploy/cloudflare/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  d1http-driver:
+    name: D1 HTTPS driver
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+      - run: go test ./app/db/d1http
+
   source-map-contract:
     name: Source map build identity
     runs-on: ubuntu-latest
