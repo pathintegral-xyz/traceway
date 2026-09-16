@@ -54,10 +54,7 @@ export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const container = await getRandom(env.TRACEWAY);
 		try {
-			await container.startAndWaitForPorts({
-				ports: [8082],
-				startOptions: { envVars: runtimeEnv(env) }
-			});
+			await container.start({ envVars: runtimeEnv(env) });
 		} catch (error) {
 			console.error('Traceway container failed to start', {
 				error: error instanceof Error ? error.message : String(error),
