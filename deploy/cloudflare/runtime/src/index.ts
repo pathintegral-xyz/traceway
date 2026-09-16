@@ -55,6 +55,7 @@ export default {
 		const container = await getRandom(env.TRACEWAY);
 		try {
 			await container.start({ envVars: runtimeEnv(env) });
+			return await container.fetch(request);
 		} catch (error) {
 			console.error('Traceway container failed to start', {
 				error: error instanceof Error ? error.message : String(error),
@@ -62,6 +63,5 @@ export default {
 			});
 			return new Response('Traceway is starting', { status: 503 });
 		}
-		return container.fetch(request);
 	}
 };
