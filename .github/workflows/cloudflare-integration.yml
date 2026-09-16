@@ -52,6 +52,19 @@ jobs:
           go-version-file: backend/go.mod
       - run: go test ./app/db/d1http
 
+  cloudflare-build:
+    name: Cloudflare server build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+      - run: go test -run '^$' -tags cloudflare ./cmd/traceway
+
   source-map-contract:
     name: Source map build identity
     runs-on: ubuntu-latest
