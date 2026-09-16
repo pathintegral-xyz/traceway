@@ -1,0 +1,38 @@
+name: Cloudflare Integration
+
+on:
+  push:
+    branches: [cloudflare]
+    paths:
+      - "backend/**"
+      - "deploy/cloudflare/**"
+      - ".github/workflows/cloudflare-integration.yml"
+  pull_request:
+    branches: [cloudflare]
+    paths:
+      - "backend/**"
+      - "deploy/cloudflare/**"
+      - ".github/workflows/cloudflare-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-map-contract:
+    name: Source map build identity
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+      - name: Reject cross-build source-map fallback
+        run: go test ./app/services -run 'TestResolveStackTrace|TestExtractDebugId|TestInvalidateSourceMap' -count=1

@@ -66,7 +66,7 @@ func TestResolveStackTracePrefersDebugId(t *testing.T) {
 	}
 }
 
-func TestResolveStackTraceFallsBackToFilenameWhenDebugIdMissing(t *testing.T) {
+func TestResolveStackTracePreservesFramesWhenDebugIdMissing(t *testing.T) {
 	useMemCache(t)
 	prev := storage.Store
 	defer func() { storage.Store = prev }()
@@ -80,10 +80,36 @@ func TestResolveStackTraceFallsBackToFilenameWhenDebugIdMissing(t *testing.T) {
 
 	input := "Error: boom\nanonymous()\n    minified.js:1:11"
 	debugIds := map[string]string{"minified.js": "85314830-023f-4cf1-a267-535f4e37bb17"}
-	lines := strings.Split(ResolveStackTrace(context.Background(), projectId, input, debugIds), "\n")
+	for attempt := 0; attempt < 2; attempt++ {
+		if got := ResolveStackTrace(context.Background(), projectId, input, debugIds); got != input {
+			t.Errorf("missing build map must preserve the original stack: got %q", got)
+		}
+	}
+	if got := cs.reads[prefix+"minified.js.map"]; got != 0 {
+		t.Errorf("must not read another build's filename map, got %d reads", got)
+	}
+	if got := cs.reads[prefix+DebugIdMapName(debugIds["minified.js"])]; got != 1 {
+		t.Errorf("missing debug ID map should be negatively cached, got %d reads", got)
+	}
+}
 
-	if got, want := lines[2], "    tests/fixtures/simple/original.js:2:10"; got != want {
-		t.Errorf("fallback location: got %q, want %q", got, want)
+func TestResolveStackTraceInvalidDebugIdDoesNotUseFilename(t *testing.T) {
+	useMemCache(t)
+	prev := storage.Store
+	t.Cleanup(func() { storage.Store = prev })
+	cs := &countingStorage{reads: map[string]int{}, data: map[string][]byte{}}
+	storage.Store = cs
+	projectId := uuid.New()
+	prefix := SourceMapStorageKey(projectId, "")
+	seedFixture(t, cs, prefix+"minified.js.map", "testdata/sourcemapcache/simple/minified.js.map")
+	input := "Error: boom\nanonymous()\n    https://example.com/minified.js:1:11"
+	for _, key := range []string{"minified.js", "https://example.com/minified.js"} {
+		if got := ResolveStackTrace(context.Background(), projectId, input, map[string]string{key: "invalid"}); got != input {
+			t.Errorf("invalid build ID must preserve the original stack: got %q", got)
+		}
+	}
+	if len(cs.reads) != 0 {
+		t.Errorf("invalid IDs must not trigger map reads: %v", cs.reads)
 	}
 }
 
