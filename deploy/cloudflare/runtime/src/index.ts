@@ -1,4 +1,4 @@
-import { Container, getRandom } from '@cloudflare/containers';
+import { Container, getContainer } from '@cloudflare/containers';
 
 export interface Env {
 	TRACEWAY: DurableObjectNamespace<TracewayContainer>;
@@ -52,7 +52,7 @@ function runtimeEnv(env: Env): Record<string, string> {
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
-		const container = await getRandom(env.TRACEWAY);
+		const container = getContainer(env.TRACEWAY, 'primary');
 		const envVars = runtimeEnv(env);
 		console.log('Traceway runtime credentials present', {
 			jwt: Boolean(envVars.JWT_SECRET),
