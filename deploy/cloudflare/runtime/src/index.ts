@@ -53,8 +53,15 @@ function runtimeEnv(env: Env): Record<string, string> {
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const container = await getRandom(env.TRACEWAY);
+		const envVars = runtimeEnv(env);
+		console.log('Traceway runtime credentials present', {
+			jwt: Boolean(envVars.JWT_SECRET),
+			d1: Boolean(envVars.CLOUDFLARE_D1_API_TOKEN),
+			r2AccessKey: Boolean(envVars.S3_ACCESS_KEY),
+			r2SecretKey: Boolean(envVars.S3_SECRET_KEY)
+		});
 		try {
-			await container.start({ envVars: runtimeEnv(env) });
+			await container.start({ envVars });
 			return await container.fetch(request);
 		} catch (error) {
 			console.error('Traceway container failed to start', {
