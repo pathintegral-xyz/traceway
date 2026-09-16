@@ -21,6 +21,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags cloudflare -ldflags="-s
 
 FROM alpine:3.20
 
+LABEL org.opencontainers.image.revision="b7598199"
 RUN apk add --no-cache ca-certificates tzdata
 COPY --from=backend-builder /traceway /usr/local/bin/traceway
 USER nobody
