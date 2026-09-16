@@ -2,3 +2,5 @@ node_modules/
 .wrangler/
 .dev.vars*
 probe-results.json
+runtime/wrangler.jsonc
+runtime/worker-configuration.d.ts

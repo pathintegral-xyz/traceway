@@ -4,12 +4,19 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "probe:d1": "node scripts/probe-d1.mjs"
+    "probe:d1": "node scripts/probe-d1.mjs",
+    "check:runtime": "tsc -p runtime/tsconfig.json"
   },
   "engines": {
     "node": ">=22"
   },
   "devDependencies": {
-    "miniflare": "5.20260915.0-alpha"
+    "@cloudflare/workers-types": "^5.20260916.1",
+    "miniflare": "5.20260915.0-alpha",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.132.0"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7"
   }
 }

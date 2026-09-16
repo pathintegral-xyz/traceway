@@ -1,0 +1,33 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "replace-with-traceway-stage-worker-name",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-09-16",
+	"compatibility_flags": ["nodejs_compat"],
+	"account_id": "replace-with-cloudflare-account-id",
+	"containers": [
+		{
+			"class_name": "TracewayContainer",
+			"image": "./Dockerfile",
+			"image_build_context": "../..",
+			"instance_type": "standard-1",
+			"max_instances": 3
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{ "name": "TRACEWAY", "class_name": "TracewayContainer" }
+		]
+	},
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["TracewayContainer"] }
+	],
+	"vars": {
+		"CLOUDFLARE_ACCOUNT_ID": "replace-with-cloudflare-account-id",
+		"CLOUDFLARE_D1_MAIN_DATABASE_ID": "replace-with-stage-main-d1-id",
+		"CLOUDFLARE_D1_TELEMETRY_DATABASE_ID": "replace-with-stage-telemetry-d1-id",
+		"S3_BUCKET": "replace-with-stage-r2-bucket-name",
+		"S3_ENDPOINT": "https://replace-with-cloudflare-account-id.r2.cloudflarestorage.com",
+		"APP_BASE_URL": "https://replace-with-stage-domain"
+	}
+}

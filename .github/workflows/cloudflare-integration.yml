@@ -37,6 +37,7 @@ jobs:
           cache: npm
           cache-dependency-path: deploy/cloudflare/package-lock.json
       - run: npm ci
+      - run: npm run check:runtime
       - run: npm test
 
   d1http-driver:
