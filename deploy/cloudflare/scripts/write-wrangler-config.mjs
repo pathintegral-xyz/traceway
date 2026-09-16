@@ -6,7 +6,8 @@ const required = [
 	'TRACEWAY_MAIN_D1_DATABASE_ID',
 	'TRACEWAY_TELEMETRY_D1_DATABASE_ID',
 	'TRACEWAY_R2_BUCKET',
-	'TRACEWAY_APP_BASE_URL'
+	'TRACEWAY_APP_BASE_URL',
+	'TRACEWAY_DOMAIN'
 ];
 
 const missing = required.filter((name) => !process.env[name]);
@@ -19,6 +20,7 @@ const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 
 config.name = process.env.TRACEWAY_WORKER_NAME;
 config.account_id = accountId;
+config.routes = [{ pattern: process.env.TRACEWAY_DOMAIN, custom_domain: true }];
 config.vars = {
 	CLOUDFLARE_ACCOUNT_ID: accountId,
 	CLOUDFLARE_D1_MAIN_DATABASE_ID: process.env.TRACEWAY_MAIN_D1_DATABASE_ID,
