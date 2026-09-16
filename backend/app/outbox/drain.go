@@ -67,6 +67,10 @@ func StartDrain(ctx context.Context) {
 // rows, deliver them, finalize. Exported so tests (and tooling) can drive the
 // outbox deterministically.
 func DrainOnce(ctx context.Context, now time.Time) {
+	if db.IsCloudflare() {
+		drainOnceD1(ctx, now)
+		return
+	}
 	dueCount := 0
 	claimed, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.OutboxDelivery, error) {
 		if !db.IsSQLite() {
@@ -164,6 +168,10 @@ func sendWithDeadline(ctx context.Context, row *models.OutboxDelivery, msg model
 }
 
 func finalizeRow(row *models.OutboxDelivery, sendErr error) {
+	if db.IsCloudflare() {
+		finalizeRowD1(row, sendErr)
+		return
+	}
 	if sendErr != nil && row.Attempts >= maxAttempts {
 		finalizeTerminal(row, sendErr.Error())
 		return
@@ -209,6 +217,10 @@ func finalizeRow(row *models.OutboxDelivery, sendErr error) {
 }
 
 func finalizeTerminal(row *models.OutboxDelivery, errorMsg string) {
+	if db.IsCloudflare() {
+		finalizeTerminalD1(row, errorMsg)
+		return
+	}
 	now := time.Now().UTC()
 	finalized, err := db.ExecuteTransaction(func(tx *sql.Tx) (bool, error) {
 		failed, err := transactional.OutboxRepository.MarkFailedWithBackoff(tx, row.Id, errorMsg, nil, now)

@@ -22,6 +22,9 @@ type HealthStats struct {
 // HealthSnapshot powers /api/health/deep. OldestPendingAgeSec measures due-age
 // (from next_attempt_at), so a scheduled future delivery does not look stuck.
 func HealthSnapshot() (*HealthStats, error) {
+	if db.IsCloudflare() {
+		return healthSnapshotD1()
+	}
 	type snapshot struct {
 		Counts *models.OutboxHealthCounts
 		Oldest *models.OutboxDelivery
