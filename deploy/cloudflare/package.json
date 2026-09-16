@@ -1,0 +1,15 @@
+{
+  "name": "traceway-cloudflare",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "probe:d1": "node scripts/probe-d1.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "miniflare": "5.20260915.0-alpha"
+  }
+}
