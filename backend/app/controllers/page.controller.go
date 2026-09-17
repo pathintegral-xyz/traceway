@@ -70,7 +70,7 @@ var validPageStatusFilters = map[string]bool{
 }
 
 func (c *pageController) List(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
@@ -376,7 +376,7 @@ type pagesForIssuesRequest struct {
 // UnresolvedForIssues reports how many unresolved pages were opened for the
 // given exception hashes, so the archive dialog can offer resolving them.
 func (c *pageController) UnresolvedForIssues(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
