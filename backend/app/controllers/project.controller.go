@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/tracewayapp/traceway/backend/app/cache"
 	"github.com/tracewayapp/traceway/backend/app/db"
-	"github.com/tracewayapp/traceway/backend/app/db/d1http"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/outbox"
@@ -16,11 +15,9 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
 )
 
@@ -174,11 +171,6 @@ func (p projectController) CreateProject(c *gin.Context) {
 	}
 
 	userId := middleware.GetUserId(c)
-	if db.IsCloudflare() {
-		p.createProjectCloudflare(c, request, projectId, userId)
-		return
-	}
-
 	var creatorRole string
 	project, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error) {
 		currentProject, err := transactional.ProjectRepository.FindById(tx, projectId)
@@ -231,73 +223,6 @@ func (p projectController) CreateProject(c *gin.Context) {
 	c.JSON(http.StatusCreated, projectWithUrl)
 }
 
-func (p projectController) createProjectCloudflare(c *gin.Context, request CreateProjectRequest, projectID uuid.UUID, userID int) {
-	currentProject, err := transactional.ProjectRepository.FindById(db.DB, projectID)
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("load current project: %w", err))
-		return
-	}
-	if currentProject == nil || currentProject.OrganizationId == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to create projects in this organization"})
-		return
-	}
-
-	targetOrganizationID := *currentProject.OrganizationId
-	if request.OrganizationId != nil {
-		targetOrganizationID = *request.OrganizationId
-	}
-	role, err := transactional.OrganizationRepository.GetUserRole(db.DB, targetOrganizationID, userID)
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("load organization role: %w", err))
-		return
-	}
-	if role == "" || role == "readonly" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to create projects in this organization"})
-		return
-	}
-	if ProjectLimitHook != nil {
-		c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("Cloudflare project limits require a D1 implementation"))
-		return
-	}
-
-	now := time.Now().UTC()
-	project := &models.Project{
-		Id:                      uuid.New(),
-		Name:                    request.Name,
-		Token:                   strings.ReplaceAll(uuid.NewString(), "-", ""),
-		Framework:               request.Framework,
-		OrganizationId:          &targetOrganizationID,
-		CreatedAt:               now,
-		DropHealthyHealthchecks: true,
-		ProfileLabelAllowlist:   models.StringSlice{},
-		AiFlaggedTerms:          models.StringSlice{},
-		AiFlaggedLanguages:      models.StringSlice(contentflag.DefaultLanguages),
-	}
-	if request.Framework == "ios" {
-		token := strings.ReplaceAll(uuid.NewString(), "-", "")
-		project.SourceMapToken = &token
-	}
-
-	results, err := db.BatchMain(c.Request.Context(), []d1http.Statement{{
-		SQL: `INSERT INTO projects (id, name, token, framework, organization_id, source_map_token, created_at, drop_healthy_healthchecks, profile_label_allowlist, ai_flagged_terms, ai_flagged_languages)
-			SELECT ?, ?, ?, ?, ou.organization_id, ?, ?, ?, ?, ?, ?
-			FROM organization_users ou
-			WHERE ou.organization_id = ? AND ou.user_id = ? AND ou.role <> 'readonly'`,
-		Params: []any{project.Id, project.Name, project.Token, project.Framework, project.SourceMapToken, project.CreatedAt, project.DropHealthyHealthchecks, project.ProfileLabelAllowlist, project.AiFlaggedTerms, project.AiFlaggedLanguages, targetOrganizationID, userID},
-	}})
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("create project D1 batch: %w", err))
-		return
-	}
-	if len(results) != 1 || results[0].Changes != 1 {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to create projects in this organization"})
-		return
-	}
-	cache.ProjectCache.AddProject(project)
-	projectWithURL := project.ToProjectWithBackendUrl()
-	projectWithURL.Role = role
-	c.JSON(http.StatusCreated, projectWithURL)
-}
 
 func (p projectController) UpdateProject(c *gin.Context) {
 	var request UpdateProjectRequest

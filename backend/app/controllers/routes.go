@@ -76,7 +76,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 
 	router.GET("/projects", middleware.UseAppAuth, ProjectController.ListProjects)
 	router.POST("/projects", middleware.UseAppAuth, middleware.RequireProjectAccess, ProjectController.CreateProject)
-	router.POST("/projects/batch", middleware.UseAppAuth, middleware.Transactional, ProjectController.BatchCreateProjects)
+	router.POST("/projects/batch", middleware.UseAppAuth, middleware.TransactionalCommand, ProjectController.BatchCreateProjects)
 	router.PUT("/projects", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, ProjectController.UpdateProject)
 	router.DELETE("/projects", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, ProjectController.DeleteProject)
 

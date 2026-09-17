@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
@@ -13,9 +14,11 @@ import (
 
 	"github.com/tracewayapp/traceway/backend/app/cache"
 	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/db/d1http"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional"
+	"github.com/tracewayapp/traceway/backend/app/services/contentflag"
 )
 
 const maxBatchProjects = 20
@@ -173,6 +176,11 @@ func (p projectController) BatchCreateProjects(ctx *gin.Context) {
 		return
 	}
 
+	if db.IsCloudflare() {
+		p.batchCreateProjectsCloudflare(ctx, request)
+		return
+	}
+
 	tx := db.GetTx(ctx)
 	if !requireOrgWrite(ctx, tx, request.OrganizationId) {
 		return
@@ -185,5 +193,103 @@ func (p projectController) BatchCreateProjects(ctx *gin.Context) {
 	}
 
 	cacheCreatedProjectsOnCommit(ctx, results)
+	ctx.JSON(http.StatusCreated, gin.H{"projects": toBatchProjectResponse(results)})
+}
+
+func (p projectController) batchCreateProjectsCloudflare(ctx *gin.Context, request BatchCreateProjectsRequest) {
+	if len(request.Projects) == 0 {
+		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": "At least one project is required"})
+		return
+	}
+	if len(request.Projects) > maxBatchProjects {
+		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": "At most 20 projects per request"})
+		return
+	}
+
+	userID := middleware.GetUserId(ctx)
+	role, err := transactional.OrganizationRepository.GetUserRole(db.DB, request.OrganizationId, userID)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("batch create projects: load organization role: %w", err))
+		return
+	}
+	if role == "" {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Organization not found"})
+		return
+	}
+	if role == "readonly" {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "You have read-only access to this organization"})
+		return
+	}
+	if ProjectLimitHook != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, errors.New("Cloudflare project limits require a D1 implementation"))
+		return
+	}
+
+	existing, err := transactional.ProjectRepository.FindByOrganizationId(db.DB, request.OrganizationId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("batch create projects: load existing projects: %w", err))
+		return
+	}
+	byName := make(map[string]*models.Project, len(existing))
+	for _, project := range existing {
+		byName[project.Name] = project
+	}
+
+	now := time.Now().UTC()
+	statements := make([]d1http.Statement, 0, len(request.Projects))
+	results := make([]BatchProjectResult, 0, len(request.Projects))
+	for i := range request.Projects {
+		input := &request.Projects[i]
+		input.Name = strings.TrimSpace(input.Name)
+		if msg := validateProjectName(input.Name); msg != "" {
+			ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": msg})
+			return
+		}
+		if !validFrameworks[input.Framework] {
+			ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": invalidFrameworkMessage})
+			return
+		}
+		if existingProject, ok := byName[input.Name]; ok {
+			if existingProject.Framework != input.Framework {
+				ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Project " + input.Name + " already exists with framework " + existingProject.Framework + "; requested " + input.Framework})
+				return
+			}
+			results = append(results, BatchProjectResult{Project: existingProject, Status: "existing"})
+			continue
+		}
+
+		project := &models.Project{
+			Id:                      uuid.New(),
+			Name:                    input.Name,
+			Token:                   strings.ReplaceAll(uuid.NewString(), "-", ""),
+			Framework:               input.Framework,
+			OrganizationId:          &request.OrganizationId,
+			CreatedAt:               now,
+			DropHealthyHealthchecks: true,
+			ProfileLabelAllowlist:   models.StringSlice{},
+			AiFlaggedTerms:          models.StringSlice{},
+			AiFlaggedLanguages:      models.StringSlice(contentflag.DefaultLanguages),
+		}
+		if input.Framework == "ios" {
+			token := strings.ReplaceAll(uuid.NewString(), "-", "")
+			project.SourceMapToken = &token
+		}
+		statements = append(statements, d1http.Statement{
+			SQL: `INSERT INTO projects (id, name, token, framework, organization_id, source_map_token, created_at, drop_healthy_healthchecks, profile_label_allowlist, ai_flagged_terms, ai_flagged_languages)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			Params: []any{project.Id, project.Name, project.Token, project.Framework, request.OrganizationId, project.SourceMapToken, project.CreatedAt, project.DropHealthyHealthchecks, project.ProfileLabelAllowlist, project.AiFlaggedTerms, project.AiFlaggedLanguages},
+		})
+		byName[project.Name] = project
+		results = append(results, BatchProjectResult{Project: project, Status: "created"})
+	}
+	if _, err := db.BatchMain(ctx.Request.Context(), statements); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("batch create projects D1: %w", err))
+		return
+	}
+	for _, result := range results {
+		if result.Status == "created" {
+			cache.ProjectCache.AddProject(result.Project)
+		}
+	}
 	ctx.JSON(http.StatusCreated, gin.H{"projects": toBatchProjectResponse(results)})
 }
