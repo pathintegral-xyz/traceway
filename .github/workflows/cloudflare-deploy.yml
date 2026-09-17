@@ -109,8 +109,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          ref: cloudflare
           fetch-depth: 0
+      - name: Resolve immutable Production commit
+        env:
+          DEPLOY_REF: ${{ inputs.ref }}
+        run: |
+          resolved_ref="$(git rev-parse --verify "$DEPLOY_REF^{commit}")"
+          git checkout --detach "$resolved_ref"
+          echo "Resolved Production commit: $resolved_ref"
       - name: Require a cloudflare integration commit
         run: |
           git fetch origin cloudflare
