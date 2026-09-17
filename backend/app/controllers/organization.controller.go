@@ -83,7 +83,7 @@ type UpdateSettingsRequest struct {
 
 func (c *organizationController) UpdateSettings(ctx *gin.Context) {
 	organizationId := middleware.GetOrganizationId(ctx)
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	var req UpdateSettingsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -136,7 +136,7 @@ func (c *organizationController) Create(ctx *gin.Context) {
 	}
 
 	userId := middleware.GetUserId(ctx)
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	// One organization per self-hosted instance; 422 rather than Register's 409 so the message reaches the recovery form.
 	if config.Config.CloudMode != "true" {

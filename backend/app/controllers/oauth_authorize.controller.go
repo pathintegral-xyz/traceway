@@ -26,7 +26,7 @@ func (c *oauthAuthorizeController) Register(ctx *gin.Context) {
 		return
 	}
 
-	client, err := authserver.RegisterClient(db.MainExecutor(ctx), req.ClientName, req.RedirectUris)
+	client, err := authserver.RegisterClient(db.GetTx(ctx), req.ClientName, req.RedirectUris)
 	if err != nil {
 		if errors.Is(err, authserver.ErrInvalidClientMetadata) {
 			ctx.JSON(http.StatusBadRequest, gin.H{
@@ -76,7 +76,7 @@ func (c *oauthAuthorizeController) Approve(ctx *gin.Context) {
 		return
 	}
 
-	redirectTo, err := authserver.ApproveAuthorization(db.MainExecutor(ctx), middleware.GetUserId(ctx), req, authserver.IssuerBaseURLFromRequest(ctx))
+	redirectTo, err := authserver.ApproveAuthorization(db.GetTx(ctx), middleware.GetUserId(ctx), req, authserver.IssuerBaseURLFromRequest(ctx))
 	if err != nil {
 		writeAuthorizeError(ctx, err)
 		return

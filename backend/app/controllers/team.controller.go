@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,7 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type teamController struct{}
@@ -58,7 +58,7 @@ type setTeamProjectsRequest struct {
 }
 
 func (c *teamController) List(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	teams, err := transactional.TeamRepository.ListByOrganization(tx, organizationId)
@@ -101,7 +101,7 @@ func (c *teamController) List(ctx *gin.Context) {
 }
 
 func (c *teamController) Create(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	var request createTeamRequest
@@ -168,7 +168,7 @@ func (c *teamController) Create(ctx *gin.Context) {
 }
 
 func (c *teamController) Update(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	team, ok := c.loadTeam(ctx, organizationId)
@@ -236,7 +236,7 @@ func (c *teamController) Update(ctx *gin.Context) {
 }
 
 func (c *teamController) Delete(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	team, ok := c.loadTeam(ctx, organizationId)
@@ -262,7 +262,7 @@ func (c *teamController) Delete(ctx *gin.Context) {
 }
 
 func (c *teamController) SetMembers(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	team, ok := c.loadTeam(ctx, organizationId)
@@ -289,7 +289,7 @@ func (c *teamController) SetMembers(ctx *gin.Context) {
 }
 
 func (c *teamController) SetProjects(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	team, ok := c.loadTeam(ctx, organizationId)
@@ -316,7 +316,7 @@ func (c *teamController) SetProjects(ctx *gin.Context) {
 }
 
 func (c *teamController) loadTeam(ctx *gin.Context, organizationId int) (*models.Team, bool) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	teamId, err := strconv.Atoi(ctx.Param("teamId"))
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid team ID"})
@@ -336,7 +336,7 @@ func (c *teamController) loadTeam(ctx *gin.Context, organizationId int) (*models
 
 // checkPolicyReferences returns a user-facing message when an escalation policy
 // targets the team or one of its schedules.
-func (c *teamController) checkPolicyReferences(tx lit.Executor, organizationId int, teamId int) (string, error) {
+func (c *teamController) checkPolicyReferences(tx *sql.Tx, organizationId int, teamId int) (string, error) {
 	referencing, err := oncall.PoliciesReferencing(tx, organizationId, oncall.TargetTeam, teamId)
 	if err != nil {
 		return "", err
@@ -365,7 +365,7 @@ func (c *teamController) checkPolicyReferences(tx lit.Executor, organizationId i
 
 // checkMembersInOrg returns a user-facing message when a userId is not a
 // member of the organization or appears twice.
-func (c *teamController) checkMembersInOrg(tx lit.Executor, organizationId int, userIds []int) (string, error) {
+func (c *teamController) checkMembersInOrg(tx *sql.Tx, organizationId int, userIds []int) (string, error) {
 	members, err := transactional.OrganizationRepository.GetMembersWithDetails(tx, organizationId)
 	if err != nil {
 		return "", err
@@ -389,7 +389,7 @@ func (c *teamController) checkMembersInOrg(tx lit.Executor, organizationId int, 
 
 // checkProjectsAssignable enforces org membership of each project and the
 // one-owning-team-per-project rule.
-func (c *teamController) checkProjectsAssignable(tx lit.Executor, organizationId int, teamId int, projectIds []uuid.UUID) (string, error) {
+func (c *teamController) checkProjectsAssignable(tx *sql.Tx, organizationId int, teamId int, projectIds []uuid.UUID) (string, error) {
 	seen := map[uuid.UUID]bool{}
 	for _, projectId := range projectIds {
 		if seen[projectId] {

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type AddWidgetRequest struct {
@@ -54,7 +54,7 @@ func (c *dashboardsController) AddWidget(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, true)
 	if dashboard == nil {
@@ -122,7 +122,7 @@ func (c *dashboardsController) UpdateWidget(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, true)
 	if dashboard == nil {
@@ -153,7 +153,7 @@ func (c *dashboardsController) UpdateWidget(ctx *gin.Context) {
 }
 
 func (c *dashboardsController) DeleteWidget(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, true)
 	if dashboard == nil {
@@ -195,7 +195,7 @@ func (c *dashboardsController) ReorderWidgets(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, true)
 	if dashboard == nil {
@@ -235,7 +235,7 @@ func (c *dashboardsController) ReorderWidgets(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"reordered": true})
 }
 
-func saveDashboardDefinition(ctx *gin.Context, tx lit.Executor, dashboard *models.Dashboard, def *models.DashboardDefinition) bool {
+func saveDashboardDefinition(ctx *gin.Context, tx *sql.Tx, dashboard *models.Dashboard, def *models.DashboardDefinition) bool {
 	definition, ok := marshalDashboardDefinition(ctx, def)
 	if !ok {
 		return false
@@ -256,7 +256,7 @@ func (c *dashboardsController) ToggleStar(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, false)
 	if dashboard == nil {
@@ -359,7 +359,7 @@ func (c *dashboardsController) ListStarred(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	starred, err := transactional.DashboardRepository.FindStarredByProject(tx, projectId)
 	if err != nil {
@@ -426,7 +426,7 @@ func (c *dashboardsController) ReorderStarred(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	starred, err := transactional.DashboardRepository.FindStarredByProject(tx, projectId)
 	if err != nil {
@@ -501,7 +501,7 @@ func (c *dashboardsController) UpdateStarredLayout(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	starred, err := transactional.DashboardRepository.FindStarredById(tx, projectId, id)
 	if err != nil {

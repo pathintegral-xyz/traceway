@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
@@ -18,7 +19,6 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional"
 	"github.com/tracewayapp/traceway/backend/app/services/contentflag"
-	"github.com/tracewayapp/lit/v2"
 )
 
 const maxBatchProjects = 20
@@ -50,7 +50,7 @@ func validateProjectName(name string) string {
 
 const invalidFrameworkMessage = "Framework must be one of: gin, fiber, chi, fasthttp, stdlib, custom, react, svelte, vuejs, nextjs, nestjs, express, remix, jquery, react-native, hono, cloudflare, opentelemetry, symfony, laravel, django, flutter, android, ios"
 
-func batchCreateProjects(tx lit.Executor, orgId int, createdBy int, inputs []BatchProjectInput) ([]BatchProjectResult, error) {
+func batchCreateProjects(tx *sql.Tx, orgId int, createdBy int, inputs []BatchProjectInput) ([]BatchProjectResult, error) {
 	if len(inputs) == 0 {
 		return nil, &batchValidationError{"At least one project is required"}
 	}
@@ -181,7 +181,7 @@ func (p projectController) BatchCreateProjects(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	if !requireOrgWrite(ctx, tx, request.OrganizationId) {
 		return
 	}

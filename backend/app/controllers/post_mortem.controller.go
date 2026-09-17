@@ -87,7 +87,7 @@ func postMortemProjectContext(ctx *gin.Context) (uuid.UUID, int, bool) {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
 		return uuid.Nil, 0, false
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	project, err := transactional.ProjectRepository.FindById(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load project: %w", err))
@@ -101,7 +101,7 @@ func postMortemProjectContext(ctx *gin.Context) (uuid.UUID, int, bool) {
 }
 
 func checkIncidentLink(ctx *gin.Context, organizationId int, projectId uuid.UUID, incidentId int) bool {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	incident, err := transactional.CheckIncidentRepository.FindByIdInOrganization(tx, incidentId, organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load incident: %w", err))
@@ -132,7 +132,7 @@ func (ctrl *postMortemController) List(ctx *gin.Context) {
 	}
 	page, pageSize := paginationFromQuery(ctx)
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	items, err := transactional.PostMortemRepository.ListByProject(tx, projectId, search, tags, pageSize, (page-1)*pageSize)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list post-mortems: %w", err))
@@ -167,7 +167,7 @@ func (ctrl *postMortemController) Get(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post-mortem id"})
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	postMortem, err := transactional.PostMortemRepository.FindDetailByIdForProject(tx, id, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load post-mortem: %w", err))
@@ -193,7 +193,7 @@ func (ctrl *postMortemController) Activity(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post-mortem id"})
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	events, err := transactional.PostMortemRepository.ListEvents(tx, id, projectId, 200)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list post-mortem activity: %w", err))
@@ -220,7 +220,7 @@ func (ctrl *postMortemController) Create(ctx *gin.Context) {
 		middleware.RejectBindError(ctx, err, "Invalid request body")
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	tags, message := validatePostMortemRequest(&req)
 	if message != "" {
 		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": message})
@@ -282,7 +282,7 @@ func (ctrl *postMortemController) Update(ctx *gin.Context) {
 		middleware.RejectBindError(ctx, err, "Invalid request body")
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	postMortem, err := transactional.PostMortemRepository.FindByIdForProject(tx, id, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load post-mortem: %w", err))
@@ -370,7 +370,7 @@ func (ctrl *postMortemController) Delete(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post-mortem id"})
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	postMortem, err := transactional.PostMortemRepository.FindByIdForProject(tx, id, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load post-mortem: %w", err))

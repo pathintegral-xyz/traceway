@@ -25,7 +25,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type contactMethodController struct{}
@@ -89,7 +88,7 @@ func smsUnavailable(methodType string) bool {
 // verification SMS through the outbox (retries for free, Twilio off the
 // request path). Returns errVerificationSendLimited when the number's send
 // budget is exhausted.
-func beginVerification(ctx *gin.Context, tx lit.Executor, method *models.UserContactMethod) error {
+func beginVerification(ctx *gin.Context, tx *sql.Tx, method *models.UserContactMethod) error {
 	if !verificationSendLimiter.Allow(oncall.SMSPhoneNumber(method.Config)) {
 		return errVerificationSendLimited
 	}
@@ -134,7 +133,7 @@ func respondBeginVerificationError(ctx *gin.Context, err error, reason string) {
 }
 
 func (c *contactMethodController) List(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	userId := middleware.GetUserId(ctx)
 	methods, err := transactional.UserContactMethodRepository.FindByUser(tx, userId)
 	if err != nil {
@@ -150,7 +149,7 @@ func (c *contactMethodController) List(ctx *gin.Context) {
 }
 
 func (c *contactMethodController) Create(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	userId := middleware.GetUserId(ctx)
 
 	var request contactMethodRequest
@@ -204,7 +203,7 @@ func (c *contactMethodController) Create(ctx *gin.Context) {
 }
 
 func (c *contactMethodController) Update(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	method, ok := c.loadOwnMethod(ctx)
 	if !ok {
 		return
@@ -322,7 +321,7 @@ func (c *contactMethodController) Verify(ctx *gin.Context) {
 }
 
 func (c *contactMethodController) ResendCode(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	method, ok := c.loadOwnMethod(ctx)
 	if !ok {
 		return
@@ -347,7 +346,7 @@ func (c *contactMethodController) ResendCode(ctx *gin.Context) {
 }
 
 func (c *contactMethodController) Delete(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	method, ok := c.loadOwnMethod(ctx)
 	if !ok {
 		return
@@ -373,7 +372,7 @@ func (c *contactMethodController) Test(ctx *gin.Context) {
 		Method *models.UserContactMethod
 		User   *models.User
 	}
-	loaded, err := db.ExecuteTransaction(func(tx lit.Executor) (methodAndUser, error) {
+	loaded, err := db.ExecuteTransaction(func(tx *sql.Tx) (methodAndUser, error) {
 		method, err := transactional.UserContactMethodRepository.FindById(tx, methodId)
 		if err != nil {
 			return methodAndUser{}, err
@@ -420,7 +419,7 @@ func (c *contactMethodController) Test(ctx *gin.Context) {
 
 func (c *contactMethodController) loadOwnMethod(ctx *gin.Context) (*models.UserContactMethod, bool) {
 	return c.resolveOwnMethod(ctx, func(methodId int) (*models.UserContactMethod, error) {
-		return transactional.UserContactMethodRepository.FindById(db.MainExecutor(ctx), methodId)
+		return transactional.UserContactMethodRepository.FindById(db.GetTx(ctx), methodId)
 	})
 }
 
@@ -430,7 +429,7 @@ func (c *contactMethodController) loadOwnMethod(ctx *gin.Context) (*models.UserC
 // the outer transaction forever.
 func (c *contactMethodController) loadOwnMethodInOwnTx(ctx *gin.Context) (*models.UserContactMethod, bool) {
 	return c.resolveOwnMethod(ctx, func(methodId int) (*models.UserContactMethod, error) {
-		return db.ExecuteTransaction(func(tx lit.Executor) (*models.UserContactMethod, error) {
+		return db.ExecuteTransaction(func(tx *sql.Tx) (*models.UserContactMethod, error) {
 			return transactional.UserContactMethodRepository.FindById(tx, methodId)
 		})
 	})

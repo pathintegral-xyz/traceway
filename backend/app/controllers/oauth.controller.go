@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -20,7 +21,6 @@ import (
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type oauthController struct{}
@@ -335,7 +335,7 @@ func (a oauthController) redirectError(c *gin.Context, code string) {
 	c.Redirect(http.StatusSeeOther, target)
 }
 
-func (a oauthController) resolveOIDCOrg(tx lit.Executor, rawData map[string]interface{}) (*models.Organization, error) {
+func (a oauthController) resolveOIDCOrg(tx *sql.Tx, rawData map[string]interface{}) (*models.Organization, error) {
 	if claim := services.OAuthService.OIDCOrgClaim(); claim != "" {
 		if val, ok := rawData[claim]; ok {
 			if orgName, ok := val.(string); ok && orgName != "" {

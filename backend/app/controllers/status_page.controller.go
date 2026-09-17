@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,7 +23,6 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/storage"
 
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type statusPageController struct{}
@@ -57,7 +57,7 @@ type statusPageRequest struct {
 
 var customDomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$`)
 
-func validateStatusPageRequest(tx lit.Executor, organizationId int, req *statusPageRequest) (string, error) {
+func validateStatusPageRequest(tx *sql.Tx, organizationId int, req *statusPageRequest) (string, error) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.Slug = strings.ToLower(strings.TrimSpace(req.Slug))
 	if req.Name == "" {
@@ -100,7 +100,7 @@ func (ctrl *statusPageController) List(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	pages, err := transactional.StatusPageRepository.ListByOrganization(tx, organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list status pages: %w", err))
@@ -122,7 +122,7 @@ func (ctrl *statusPageController) Create(ctx *gin.Context) {
 		middleware.RejectBindError(ctx, err, "Invalid request body")
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	if message, err := validateStatusPageRequest(tx, organizationId, &req); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to validate status page: %w", err))
 		return
@@ -184,7 +184,7 @@ func (ctrl *statusPageController) Update(ctx *gin.Context) {
 		middleware.RejectBindError(ctx, err, "Invalid request body")
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	page, err := transactional.StatusPageRepository.FindByIdForOrganization(tx, id, organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load status page: %w", err))
@@ -250,7 +250,7 @@ func (ctrl *statusPageController) Delete(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status page id"})
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	page, err := transactional.StatusPageRepository.FindByIdForOrganization(tx, id, organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load status page: %w", err))
@@ -370,7 +370,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 		page   *models.StatusPage
 		checks []*models.SyntheticCheck
 	}
-	loaded, err := db.ExecuteTransaction(func(tx lit.Executor) (pageWithChecks, error) {
+	loaded, err := db.ExecuteTransaction(func(tx *sql.Tx) (pageWithChecks, error) {
 		page, err := transactional.StatusPageRepository.FindPublicBySlug(tx, slug)
 		if err != nil || page == nil {
 			return pageWithChecks{}, err
@@ -435,7 +435,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 			day.MaxLatencyMs = 0
 		}
 
-		incidents, err := db.ExecuteTransaction(func(tx lit.Executor) ([]*models.CheckIncident, error) {
+		incidents, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.CheckIncident, error) {
 			return transactional.CheckIncidentRepository.FindByCheckSince(tx, check.Id, from)
 		})
 		if err != nil {
@@ -466,7 +466,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 		})
 	}
 
-	manualIncidents, err := db.ExecuteTransaction(func(tx lit.Executor) ([]*models.CheckIncident, error) {
+	manualIncidents, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.CheckIncident, error) {
 		return transactional.CheckIncidentRepository.FindByStatusPageSince(tx, loaded.page.Id, from)
 	})
 	if err != nil {
@@ -488,7 +488,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 	for i, source := range pastIncidents {
 		incidentIds[i] = source.incident.Id
 	}
-	updates, err := db.ExecuteTransaction(func(tx lit.Executor) ([]*models.IncidentUpdate, error) {
+	updates, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.IncidentUpdate, error) {
 		return transactional.IncidentUpdateRepository.FindByIncidentIds(tx, incidentIds)
 	})
 	if err != nil {
@@ -538,7 +538,7 @@ func (ctrl *statusPageController) UploadLogo(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status page id"})
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	page, err := transactional.StatusPageRepository.FindByIdForOrganization(tx, id, organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load status page: %w", err))
@@ -577,7 +577,7 @@ func (ctrl *statusPageController) UploadLogo(ctx *gin.Context) {
 // PublicLogo streams the logo of a public status page.
 func (ctrl *statusPageController) PublicLogo(ctx *gin.Context) {
 	slug := strings.ToLower(ctx.Param("slug"))
-	page, err := db.ExecuteTransaction(func(tx lit.Executor) (*models.StatusPage, error) {
+	page, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.StatusPage, error) {
 		return transactional.StatusPageRepository.FindPublicBySlug(tx, slug)
 	})
 	if err != nil {
@@ -610,7 +610,7 @@ func (ctrl *statusPageController) ResolveHost(ctx *gin.Context) {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
-	page, err := db.ExecuteTransaction(func(tx lit.Executor) (*models.StatusPage, error) {
+	page, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.StatusPage, error) {
 		return transactional.StatusPageRepository.FindPublicByCustomDomain(tx, host)
 	})
 	if err != nil {

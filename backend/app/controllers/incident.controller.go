@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -15,7 +16,6 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional"
 
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type incidentController struct{}
@@ -36,7 +36,7 @@ func incidentIdFromPath(ctx *gin.Context) (int, bool) {
 	return id, true
 }
 
-func invalidateOrgStatusPageCaches(tx lit.Executor, organizationId int) error {
+func invalidateOrgStatusPageCaches(tx *sql.Tx, organizationId int) error {
 	pages, err := transactional.StatusPageRepository.ListByOrganization(tx, organizationId)
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func invalidateOrgStatusPageCaches(tx lit.Executor, organizationId int) error {
 	return nil
 }
 
-func loadOrgIncident(ctx *gin.Context, tx lit.Executor, organizationId int) (*models.CheckIncident, bool) {
+func loadOrgIncident(ctx *gin.Context, tx *sql.Tx, organizationId int) (*models.CheckIncident, bool) {
 	incidentId, ok := incidentIdFromPath(ctx)
 	if !ok {
 		return nil, false
@@ -70,7 +70,7 @@ type incidentView struct {
 	PostMortemId *int `json:"postMortemId"`
 }
 
-func incidentDecorations(ctx *gin.Context, tx lit.Executor, incidentIds []int) (map[int]int, map[int]int, bool) {
+func incidentDecorations(ctx *gin.Context, tx *sql.Tx, incidentIds []int) (map[int]int, map[int]int, bool) {
 	counts, err := transactional.IncidentUpdateRepository.CountByIncidentIds(tx, incidentIds)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to count incident updates: %w", err))
@@ -90,7 +90,7 @@ func incidentDecorations(ctx *gin.Context, tx lit.Executor, incidentIds []int) (
 	return counts, postMortemIds, true
 }
 
-func buildIncidentViews(ctx *gin.Context, tx lit.Executor, incidents []*models.OrgIncident) ([]incidentView, bool) {
+func buildIncidentViews(ctx *gin.Context, tx *sql.Tx, incidents []*models.OrgIncident) ([]incidentView, bool) {
 	incidentIds := make([]int, len(incidents))
 	for i, incident := range incidents {
 		incidentIds[i] = incident.Id
@@ -116,7 +116,7 @@ func (ctrl *incidentController) List(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	since := time.Now().UTC().AddDate(0, 0, -incidentWindowDays)
 	incidents, err := transactional.CheckIncidentRepository.FindRecentByOrganization(tx, organizationId, since, incidentListLimit)
 	if err != nil {
@@ -145,7 +145,7 @@ func (ctrl *incidentController) ListForStatusPage(ctx *gin.Context) {
 	}
 	page, pageSize := paginationFromQuery(ctx)
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	statusPage, err := transactional.StatusPageRepository.FindByIdForOrganization(tx, pageId, organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load status page: %w", err))
@@ -189,7 +189,7 @@ func (ctrl *incidentController) ListUpdates(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	incident, ok := loadOrgIncident(ctx, tx, organizationId)
 	if !ok {
 		return
@@ -227,7 +227,7 @@ func (ctrl *incidentController) Create(ctx *gin.Context) {
 		middleware.RejectBindError(ctx, err, "Invalid request body")
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	page, err := transactional.StatusPageRepository.FindByIdForOrganization(tx, pageId, organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load status page: %w", err))
@@ -331,7 +331,7 @@ func (ctrl *incidentController) Update(ctx *gin.Context) {
 		middleware.RejectBindError(ctx, err, "Invalid request body")
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	incident, ok := loadOrgIncident(ctx, tx, organizationId)
 	if !ok {
 		return
@@ -420,7 +420,7 @@ func (ctrl *incidentController) Delete(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	incident, ok := loadOrgIncident(ctx, tx, organizationId)
 	if !ok {
 		return
@@ -455,7 +455,7 @@ func (ctrl *incidentController) CreateUpdate(ctx *gin.Context) {
 		middleware.RejectBindError(ctx, err, "Invalid request body")
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	incident, ok := loadOrgIncident(ctx, tx, organizationId)
 	if !ok {
 		return
@@ -514,7 +514,7 @@ func (ctrl *incidentController) DeleteUpdate(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid update id"})
 		return
 	}
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	incident, ok := loadOrgIncident(ctx, tx, organizationId)
 	if !ok {
 		return

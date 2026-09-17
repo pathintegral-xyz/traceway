@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,7 +20,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type dashboardsController struct{}
@@ -154,7 +154,7 @@ func validateDefinitionWidgets(def *models.DashboardDefinition) string {
 	return ""
 }
 
-func loadDashboardForUser(ctx *gin.Context, tx lit.Executor, requireWrite bool) *models.Dashboard {
+func loadDashboardForUser(ctx *gin.Context, tx *sql.Tx, requireWrite bool) *models.Dashboard {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -189,7 +189,7 @@ func loadDashboardForUser(ctx *gin.Context, tx lit.Executor, requireWrite bool) 
 	return dashboard
 }
 
-func requireOrgWrite(ctx *gin.Context, tx lit.Executor, organizationId int) bool {
+func requireOrgWrite(ctx *gin.Context, tx *sql.Tx, organizationId int) bool {
 	userId := middleware.GetUserId(ctx)
 	role, err := transactional.OrganizationRepository.GetUserRole(tx, organizationId, userId)
 	if err != nil {
@@ -207,7 +207,7 @@ func requireOrgWrite(ctx *gin.Context, tx lit.Executor, organizationId int) bool
 	return true
 }
 
-func requireProjectWrite(ctx *gin.Context, tx lit.Executor, projectId uuid.UUID) bool {
+func requireProjectWrite(ctx *gin.Context, tx *sql.Tx, projectId uuid.UUID) bool {
 	userId := middleware.GetUserId(ctx)
 	role, err := transactional.ProjectRepository.GetEffectiveRole(tx, projectId, userId)
 	if err != nil {
@@ -314,7 +314,7 @@ type LibraryOrganization struct {
 
 func (c *dashboardsController) Library(ctx *gin.Context) {
 	userId := middleware.GetUserId(ctx)
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	orgs, err := transactional.OrganizationRepository.FindByUserId(tx, userId)
 	if err != nil {
@@ -375,7 +375,7 @@ func (c *dashboardsController) Library(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"organizations": result})
 }
 
-func resolveTargetOrganization(ctx *gin.Context, tx lit.Executor, explicitOrgId *int) (int, bool) {
+func resolveTargetOrganization(ctx *gin.Context, tx *sql.Tx, explicitOrgId *int) (int, bool) {
 	if explicitOrgId != nil {
 		return *explicitOrgId, true
 	}
@@ -405,7 +405,7 @@ func dashboardNameTaken(dashboards []*models.Dashboard, name string, excludeId i
 	return false
 }
 
-func applyDashboardToProjects(ctx *gin.Context, tx lit.Executor, dashboard *models.Dashboard, projectIds []uuid.UUID) bool {
+func applyDashboardToProjects(ctx *gin.Context, tx *sql.Tx, dashboard *models.Dashboard, projectIds []uuid.UUID) bool {
 	for _, projectId := range projectIds {
 		project, err := transactional.ProjectRepository.FindById(tx, projectId)
 		if err != nil {
@@ -467,7 +467,7 @@ func (c *dashboardsController) Create(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	organizationId, ok := resolveTargetOrganization(ctx, tx, req.OrganizationId)
 	if !ok {
@@ -545,7 +545,7 @@ func (c *dashboardsController) Create(ctx *gin.Context) {
 }
 
 func (c *dashboardsController) Get(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, false)
 	if dashboard == nil {
@@ -619,7 +619,7 @@ func (c *dashboardsController) Update(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, true)
 	if dashboard == nil {
@@ -692,7 +692,7 @@ func (c *dashboardsController) Update(ctx *gin.Context) {
 }
 
 func (c *dashboardsController) Delete(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -753,7 +753,7 @@ func (c *dashboardsController) Apply(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, true)
 	if dashboard == nil {
@@ -810,7 +810,7 @@ func (c *dashboardsController) Apply(ctx *gin.Context) {
 }
 
 func (c *dashboardsController) Unapply(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, false)
 	if dashboard == nil {
@@ -851,7 +851,7 @@ func (c *dashboardsController) Copy(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	source := loadDashboardForUser(ctx, tx, false)
 	if source == nil {
@@ -938,7 +938,7 @@ func (c *dashboardsController) Reorder(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 
 	assignments, err := transactional.DashboardRepository.FindAssignmentsByProject(tx, projectId)
 	if err != nil {

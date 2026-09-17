@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type notificationChannelController struct{}
@@ -29,7 +29,7 @@ func (ctrl *notificationChannelController) List(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	channels, err := transactional.NotificationChannelRepository.FindByProject(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list notification channels: %w", err))
@@ -52,7 +52,7 @@ var validChannelTypes = map[string]bool{
 // validateEscalationChannelConfig checks the {policyId} config against the
 // project's organization. Escalation channels have no adapter, so this
 // replaces the NewAdapter validation path. Returns a 422 message.
-func validateEscalationChannelConfig(tx lit.Executor, projectId uuid.UUID, config json.RawMessage) (string, error) {
+func validateEscalationChannelConfig(tx *sql.Tx, projectId uuid.UUID, config json.RawMessage) (string, error) {
 	policyId := oncall.EscalationChannelPolicyId(config)
 	if policyId == 0 {
 		return "An escalation policy is required.", nil
@@ -73,7 +73,7 @@ func validateEscalationChannelConfig(tx lit.Executor, projectId uuid.UUID, confi
 
 // validateChannelConfig routes to the right validation for the channel type.
 // Returns a 422 message, or an empty string when the config is valid.
-func validateChannelConfig(tx lit.Executor, projectId uuid.UUID, channelType string, config json.RawMessage) (string, error) {
+func validateChannelConfig(tx *sql.Tx, projectId uuid.UUID, channelType string, config json.RawMessage) (string, error) {
 	if channelType == "escalation" {
 		return validateEscalationChannelConfig(tx, projectId, config)
 	}
@@ -114,7 +114,7 @@ func (ctrl *notificationChannelController) Create(ctx *gin.Context) {
 		return
 	}
 
-	if message, err := validateChannelConfig(db.MainExecutor(ctx), projectId, req.ChannelType, req.Config); err != nil {
+	if message, err := validateChannelConfig(db.GetTx(ctx), projectId, req.ChannelType, req.Config); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to validate channel config: %w", err))
 		return
 	} else if message != "" {
@@ -128,7 +128,7 @@ func (ctrl *notificationChannelController) Create(ctx *gin.Context) {
 		createdBy = &userId
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	now := time.Now().UTC()
 	channel := &models.NotificationChannel{
 		ProjectId:   projectId,
@@ -185,7 +185,7 @@ func (ctrl *notificationChannelController) Update(ctx *gin.Context) {
 		return
 	}
 
-	if message, err := validateChannelConfig(db.MainExecutor(ctx), projectId, req.ChannelType, req.Config); err != nil {
+	if message, err := validateChannelConfig(db.GetTx(ctx), projectId, req.ChannelType, req.Config); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to validate channel config: %w", err))
 		return
 	} else if message != "" {
@@ -193,7 +193,7 @@ func (ctrl *notificationChannelController) Update(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	existing, err := transactional.NotificationChannelRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find notification channel: %w", err))
@@ -231,7 +231,7 @@ func (ctrl *notificationChannelController) Delete(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	existing, err := transactional.NotificationChannelRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to delete notification channel: %w", err))
@@ -264,7 +264,7 @@ func (ctrl *notificationChannelController) Test(ctx *gin.Context) {
 		return
 	}
 
-	channel, err := db.ExecuteTransaction(func(tx lit.Executor) (*models.NotificationChannel, error) {
+	channel, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.NotificationChannel, error) {
 		return transactional.NotificationChannelRepository.FindById(tx, id)
 	})
 	if err != nil {

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type distributedTraceController struct{}
@@ -53,7 +53,7 @@ func (d distributedTraceController) GetDistributedTrace(c *gin.Context) {
 
 	userId := middleware.GetUserId(c)
 
-	projects, err := db.ExecuteTransaction(func(tx lit.Executor) ([]*models.Project, error) {
+	projects, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
 		return transactional.ProjectRepository.FindByUserId(tx, userId)
 	})
 	if err != nil {

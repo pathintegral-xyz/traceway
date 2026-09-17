@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -17,7 +18,6 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/synthetics"
 
 	traceway "go.tracewayapp.com"
-	"github.com/tracewayapp/lit/v2"
 )
 
 type syntheticRunnerController struct{}
@@ -105,7 +105,7 @@ func (ctrl *syntheticRunnerController) Poll(ctx *gin.Context) {
 func claimRunnerJobs(runner *models.SyntheticRunner, maxJobs int) ([]runnerJob, error) {
 	claimedBy := runnerClaimedBy(runner.Name)
 	now := time.Now().UTC()
-	return db.ExecuteTransaction(func(tx lit.Executor) ([]runnerJob, error) {
+	return db.ExecuteTransaction(func(tx *sql.Tx) ([]runnerJob, error) {
 		due, err := transactional.CheckRunRepository.FindClaimableBrowser(tx, now, maxJobs)
 		if err != nil {
 			return nil, err
@@ -187,7 +187,7 @@ func (ctrl *syntheticRunnerController) Result(ctx *gin.Context) {
 		return
 	}
 
-	run, err := db.ExecuteTransaction(func(tx lit.Executor) (*models.CheckRun, error) {
+	run, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.CheckRun, error) {
 		return transactional.CheckRunRepository.FindById(tx, runId)
 	})
 	if err != nil {

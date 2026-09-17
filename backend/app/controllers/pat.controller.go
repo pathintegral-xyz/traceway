@@ -20,7 +20,7 @@ import (
 type patController struct{}
 
 func (c *patController) Create(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	userId := middleware.GetUserId(ctx)
 
 	var req models.CreatePATRequest
@@ -79,7 +79,7 @@ func (c *patController) List(ctx *gin.Context) {
 }
 
 func (c *patController) Revoke(ctx *gin.Context) {
-	tx := db.MainExecutor(ctx)
+	tx := db.GetTx(ctx)
 	userId := middleware.GetUserId(ctx)
 	id := ctx.Param("id")
 
