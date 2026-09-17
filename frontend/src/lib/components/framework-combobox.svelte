@@ -34,16 +34,9 @@
 		{
 			value: 'react',
 			label: 'React',
-			description: 'React single-page apps',
+			description: 'React apps, including Next.js and Remix',
 			group: 'Browser',
-			keywords: 'react browser frontend spa'
-		},
-		{
-			value: 'nextjs',
-			label: 'Next.js',
-			description: 'Next.js full-stack apps',
-			group: 'Browser',
-			keywords: 'next nextjs next.js react server components app router pages router browser frontend'
+			keywords: 'react nextjs next.js remix browser frontend spa'
 		},
 		{
 			value: 'svelte',

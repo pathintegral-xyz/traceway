@@ -327,9 +327,7 @@ func (p projectController) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	project, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error) {
-		return transactional.ProjectRepository.Update(tx, projectId, request.Name, request.Framework, request.DropHealthyHealthchecks, healthcheckPaths, profileLabelAllowlist, aiFlaggedTerms, aiFlaggedLanguages)
-	})
+	project, err := transactional.ProjectRepository.Update(db.MainExecutor(c), projectId, request.Name, request.Framework, request.DropHealthyHealthchecks, healthcheckPaths, profileLabelAllowlist, aiFlaggedTerms, aiFlaggedLanguages)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("error updating project: %w", err))
 		return
