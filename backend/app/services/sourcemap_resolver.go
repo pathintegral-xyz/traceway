@@ -176,22 +176,19 @@ func ResolveStackTrace(ctx context.Context, projectId uuid.UUID, stackTrace stri
 }
 
 func frameData(ctx context.Context, prefix, fileName, base string, debugIds map[string]string, local map[string]borrow) []byte {
-	rawID := debugIds[fileName]
-	if rawID == "" {
-		rawID = debugIds[base]
+	id := NormalizeDebugId(debugIds[fileName])
+	if id == "" {
+		id = NormalizeDebugId(debugIds[base])
 	}
-	if rawID != "" {
-		id := NormalizeDebugId(rawID)
-		if id == "" {
-			return nil
-		}
+	if id != "" {
 		mapKey := prefix + DebugIdMapName(id)
 		twKey := twKeyFor(mapKey)
-		if sharedCache.IsNegative(twKey) {
-			return nil
+		if !sharedCache.IsNegative(twKey) {
+			bundleKey := prefix + DebugIdBundleName(id)
+			if data := getBlob(ctx, twKey, loadSourceMapBlob(mapKey, bundleKey), local); data != nil {
+				return data
+			}
 		}
-		// A filename may now belong to another build; an explicit ID is authoritative.
-		return getBlob(ctx, twKey, loadSourceMapBlob(mapKey, prefix+DebugIdBundleName(id)), local)
 	}
 
 	mapKey := prefix + base + ".map"
