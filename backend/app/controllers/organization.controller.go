@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"errors"
 	"github.com/tracewayapp/traceway/backend/app/config"
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -30,28 +29,22 @@ func (c *organizationController) GetSettings(ctx *gin.Context) {
 		Invitations  []*models.InvitationWithInviter
 	}
 
-	data, err := db.ExecuteTransaction(func(tx *sql.Tx) (*settingsData, error) {
-		org, err := transactional.OrganizationRepository.FindById(tx, organizationId)
-		if err != nil {
-			return nil, err
-		}
-
-		members, err := transactional.OrganizationRepository.GetMembersWithDetails(tx, organizationId)
-		if err != nil {
-			return nil, err
-		}
-
-		invitations, err := transactional.InvitationRepository.FindByOrganization(tx, organizationId)
-		if err != nil {
-			return nil, err
-		}
-
-		return &settingsData{
-			Organization: org,
-			Members:      members,
-			Invitations:  invitations,
-		}, nil
-	})
+	org, err := transactional.OrganizationRepository.FindById(db.MainExecutor(ctx), organizationId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("Failed to load settings: %w", err))
+		return
+	}
+	members, err := transactional.OrganizationRepository.GetMembersWithDetails(db.MainExecutor(ctx), organizationId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("Failed to load settings: %w", err))
+		return
+	}
+	invitations, err := transactional.InvitationRepository.FindByOrganization(db.MainExecutor(ctx), organizationId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("Failed to load settings: %w", err))
+		return
+	}
+	data := &settingsData{Organization: org, Members: members, Invitations: invitations}
 
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("Failed to load settings: %w", err))
@@ -74,9 +67,7 @@ func (c *organizationController) GetSettings(ctx *gin.Context) {
 func (c *organizationController) GetMembers(ctx *gin.Context) {
 	organizationId := middleware.GetOrganizationId(ctx)
 
-	members, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.OrganizationMember, error) {
-		return transactional.OrganizationRepository.GetMembersWithDetails(tx, organizationId)
-	})
+	members, err := transactional.OrganizationRepository.GetMembersWithDetails(db.MainExecutor(ctx), organizationId)
 
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("Failed to load members: %w", err))

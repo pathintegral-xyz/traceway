@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"database/sql"
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional"
 	"net/http"
@@ -39,9 +38,7 @@ func requireOrgRole(permitted func(role string) bool, denialMessage string) gin.
 			return
 		}
 
-		role, err := db.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
-			return transactional.OrganizationRepository.GetUserRole(tx, organizationId, userId)
-		})
+		role, err := transactional.OrganizationRepository.GetUserRole(db.MainExecutor(c), organizationId, userId)
 
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, traceway.NewStackTraceErrorf("Failed to check permissions: %w", err))

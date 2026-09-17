@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"database/sql"
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional"
 	"net/http"
@@ -30,9 +29,7 @@ func InitRequireWriteAccess() {
 			return
 		}
 
-		role, err := db.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
-			return transactional.ProjectRepository.GetEffectiveRole(tx, projectId, userId)
-		})
+		role, err := transactional.ProjectRepository.GetEffectiveRole(db.MainExecutor(c), projectId, userId)
 
 		if err != nil {
 			c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to resolve effective role: %w", err))
