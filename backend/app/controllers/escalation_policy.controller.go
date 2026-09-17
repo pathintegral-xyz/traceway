@@ -30,7 +30,7 @@ type escalationPolicyRequest struct {
 // ListForProject serves the channel-dialog picker and the on-call page: all
 // policies of the project's organization, readable by any project member.
 func (c *escalationPolicyController) ListForProject(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
@@ -57,7 +57,7 @@ func (c *escalationPolicyController) ListForProject(ctx *gin.Context) {
 }
 
 func (c *escalationPolicyController) ListForOrganization(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	policies, err := transactional.EscalationPolicyRepository.FindByOrganization(tx, organizationId)
 	if err != nil {

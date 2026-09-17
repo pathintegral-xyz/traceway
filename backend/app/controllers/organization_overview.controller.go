@@ -602,7 +602,7 @@ func (c *organizationOverviewController) Pages(ctx *gin.Context) {
 }
 
 func (c *organizationOverviewController) Counts(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	openCount, err := transactional.PageRepository.CountByOrganization(tx, organizationId, models.PageStatusOpen)
 	if err != nil {

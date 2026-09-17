@@ -32,7 +32,7 @@ type DashboardTemplateListItem struct {
 }
 
 func (c *dashboardTemplateController) List(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	templates, err := transactional.DashboardTemplateRepository.FindAll(tx)
 	if err != nil {

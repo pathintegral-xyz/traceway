@@ -62,7 +62,7 @@ func (c *ackController) loadPageForToken(ctx *gin.Context) (*models.Page, *model
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "Page not found"})
 		return nil, nil, false
 	}
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	notification, err := transactional.PageNotificationRepository.FindByAckTokenHash(tx, hash)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to look up ack token: %w", err))
@@ -85,7 +85,7 @@ func (c *ackController) loadPageForToken(ctx *gin.Context) (*models.Page, *model
 }
 
 func (c *ackController) Get(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	page, _, ok := c.loadPageForToken(ctx)
 	if !ok {
 		return

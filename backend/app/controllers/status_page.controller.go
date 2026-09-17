@@ -100,7 +100,7 @@ func (ctrl *statusPageController) List(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	pages, err := transactional.StatusPageRepository.ListByOrganization(tx, organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list status pages: %w", err))

@@ -139,7 +139,7 @@ func (c *memberController) RemoveMember(ctx *gin.Context) {
 }
 
 func (c *memberController) GetProjectRoles(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	targetUserId, err := strconv.Atoi(ctx.Param("userId"))
