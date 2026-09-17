@@ -1,4 +1,8 @@
 name: Deploy Traceway to Cloudflare
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format('Deploy {0} · {1}', inputs.target, inputs.ref || 'missing-ref')
+      || 'Deploy stage · cloudflare branch' }}
 
 on:
   push:
@@ -29,7 +33,7 @@ permissions:
 jobs:
   deploy-stage:
     if: github.event_name == 'push' || inputs.target == 'stage'
-    name: Deploy Stage
+    name: Deploy Stage · stage
     runs-on: ubuntu-latest
     environment: stage
     concurrency:
@@ -83,7 +87,7 @@ jobs:
 
   deploy-prod:
     if: github.event_name == 'workflow_dispatch' && inputs.target == 'prod' && inputs.ref != ''
-    name: Deploy Production
+    name: Deploy Production · prod (approval required)
     runs-on: ubuntu-latest
     environment: production
     concurrency:
@@ -125,14 +129,6 @@ jobs:
       - name: Generate Production Worker configuration
         working-directory: deploy/cloudflare
         run: node scripts/write-wrangler-config.mjs
-      - name: Create Production Worker and Container
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.132.0"
-          workingDirectory: deploy/cloudflare
-          command: deploy --config runtime/wrangler.generated.jsonc
       - name: Upload Production Worker secrets
         working-directory: deploy/cloudflare
         run: |
