@@ -264,15 +264,15 @@ func (c *dashboardsController) List(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	ex := db.MainExecutor(ctx)
 
-	dashboards, err := transactional.DashboardRepository.FindByProject(tx, projectId)
+	dashboards, err := transactional.DashboardRepository.FindByProject(ex, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list dashboards: %w", err))
 		return
 	}
 
-	project, err := transactional.ProjectRepository.FindById(tx, projectId)
+	project, err := transactional.ProjectRepository.FindById(ex, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find project: %w", err))
 		return

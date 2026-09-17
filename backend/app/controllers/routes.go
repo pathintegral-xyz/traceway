@@ -102,7 +102,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.GET("/metrics/discover/org", middleware.UseAppAuth, MetricQueryController.DiscoverOrg)
 	router.PUT("/metrics/registry", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, MetricQueryController.UpdateRegistry)
 
-	router.GET("/dashboards", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.Transactional, DashboardsController.List)
+	router.GET("/dashboards", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.TransactionalRead, DashboardsController.List)
 	router.POST("/dashboards", middleware.UseAppAuth, middleware.Transactional, DashboardsController.Create)
 	router.GET("/dashboards/library", middleware.UseAppAuth, middleware.Transactional, DashboardsController.Library)
 	router.POST("/dashboards/populate-defaults", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, DashboardsController.PopulateDefaults)

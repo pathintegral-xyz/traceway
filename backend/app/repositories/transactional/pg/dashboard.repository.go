@@ -32,7 +32,7 @@ func (r *dashboardRepository) FindByOrganization(tx *sql.Tx, organizationId int)
 	)
 }
 
-func (r *dashboardRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.Dashboard, error) {
+func (r *dashboardRepository) FindByProject(tx lit.Executor, projectId uuid.UUID) ([]*models.Dashboard, error) {
 	return lit.SelectNamed[models.Dashboard](
 		tx,
 		`SELECT d.id, d.organization_id, d.name, d.description, d.definition, d.template_key, d.created_by, d.created_at, d.updated_at
