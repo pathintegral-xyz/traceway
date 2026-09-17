@@ -2,4 +2,4 @@
 
 package middleware
 
-func cloudflareTransactionMode(string) transactionMode { return transactionRequired }
+func cloudflareTransactionMode(string, string) transactionMode { return transactionRequired }

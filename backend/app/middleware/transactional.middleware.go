@@ -18,7 +18,7 @@ const (
 )
 
 func Transactional(c *gin.Context) {
-	switch cloudflareTransactionMode(c.FullPath()) {
+	switch cloudflareTransactionMode(c.Request.Method, c.FullPath()) {
 	case transactionRead:
 		c.Next()
 		return
