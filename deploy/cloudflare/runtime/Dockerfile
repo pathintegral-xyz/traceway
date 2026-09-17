@@ -16,8 +16,8 @@ RUN apk add --no-cache git
 COPY backend/ ./
 COPY cli/ /app/cli/
 COPY --from=frontend-builder /app/frontend/build ./static/frontend/
-RUN go mod edit -dropreplace=go.tracewayapp.com -dropreplace=go.tracewayapp.com/tracewaygin && go mod tidy && go mod download
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags cloudflare -ldflags="-s -w" -o /traceway ./cmd/traceway
+RUN go mod edit -dropreplace=go.tracewayapp.com -dropreplace=go.tracewayapp.com/tracewaygin
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=mod -tags cloudflare -ldflags="-s -w" -o /traceway ./cmd/traceway
 
 FROM alpine:3.20
 
