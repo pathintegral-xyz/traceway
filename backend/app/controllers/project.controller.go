@@ -136,9 +136,7 @@ type DeleteProjectRequest struct {
 func (p projectController) ListProjects(c *gin.Context) {
 	userId := middleware.GetUserId(c)
 
-	projectsWithBackendUrl, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.ProjectWithBackendUrl, error) {
-		return transactional.ProjectRepository.FindAllWithBackendUrlByUserId(tx, userId)
-	})
+	projectsWithBackendUrl, err := transactional.ProjectRepository.FindAllWithBackendUrlByUserId(db.MainExecutor(c), userId)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("error fetching projects: %w", err))
 		return

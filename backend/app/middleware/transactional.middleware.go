@@ -60,6 +60,17 @@ func TransactionalCommand(c *gin.Context) {
 	Transactional(c)
 }
 
+// TransactionalRead preserves a request transaction on native deployments.
+// D1 reads use the shared main executor directly because D1 does not expose
+// database/sql transactions.
+func TransactionalRead(c *gin.Context) {
+	if db.IsCloudflare() {
+		c.Next()
+		return
+	}
+	Transactional(c)
+}
+
 const commitHooksContextKey = "txCommitHooks"
 
 // OnCommit queues fn to run after the Transactional middleware successfully

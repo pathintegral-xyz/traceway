@@ -22,8 +22,7 @@ const passwordLoginDisabledMessage = "Password login is disabled. Please use SSO
 type authController struct{}
 
 func (a authController) HasOrganizations(c *gin.Context) {
-	tx := db.GetTx(c)
-	hasOrganizations, err := transactional.OrganizationRepository.HasOrganizations(tx)
+	hasOrganizations, err := transactional.OrganizationRepository.HasOrganizations(db.MainExecutor(c))
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)

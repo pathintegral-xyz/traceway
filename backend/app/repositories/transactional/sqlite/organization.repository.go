@@ -30,7 +30,7 @@ func (r *organizationRepository) Create(tx *sql.Tx, name string, timezone string
 	return org, nil
 }
 
-func (r *organizationRepository) HasOrganizations(tx *sql.Tx) (bool, error) {
+func (r *organizationRepository) HasOrganizations(tx lit.Executor) (bool, error) {
 	result, err := lit.SelectSingle[models.CountResult](
 		tx,
 		`SELECT COUNT(*) as count

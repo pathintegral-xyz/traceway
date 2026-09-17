@@ -219,7 +219,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	// at the origin root, not under /api.
 
 	if config.Config.CloudMode != "true" {
-		router.GET("/has-organizations", middleware.Transactional, AuthController.HasOrganizations)
+		router.GET("/has-organizations", middleware.TransactionalRead, AuthController.HasOrganizations)
 	}
 
 	// slightly tighter limit since every accepted request sends an email

@@ -86,6 +86,16 @@ func GetTx(ctx context.Context) *sql.Tx {
 	return nil
 }
 
+// MainExecutor returns the request transaction when one exists and otherwise
+// the main database. Read handlers use it so their repository calls work on
+// both the native transactional database and Cloudflare D1.
+func MainExecutor(ctx context.Context) lit.Executor {
+	if tx := GetTx(ctx); tx != nil {
+		return tx
+	}
+	return DB
+}
+
 type ctxKey struct{}
 
 func ContextWithTx(ctx context.Context, tx *sql.Tx) context.Context {
