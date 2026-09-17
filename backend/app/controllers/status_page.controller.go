@@ -436,7 +436,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 			day.MaxLatencyMs = 0
 		}
 
-		incidents, err := transactional.CheckIncidentRepository.FindByCheckSince(db.MainExecutor(c), check.Id, from)
+		incidents, err := transactional.CheckIncidentRepository.FindByCheckSince(db.MainExecutor(ctx), check.Id, from)
 		if err != nil {
 			return nil, err
 		}
@@ -465,7 +465,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 		})
 	}
 
-	manualIncidents, err := transactional.CheckIncidentRepository.FindByStatusPageSince(db.MainExecutor(c), loaded.page.Id, from)
+	manualIncidents, err := transactional.CheckIncidentRepository.FindByStatusPageSince(db.MainExecutor(ctx), loaded.page.Id, from)
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +485,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 	for i, source := range pastIncidents {
 		incidentIds[i] = source.incident.Id
 	}
-	updates, err := transactional.IncidentUpdateRepository.FindByIncidentIds(db.MainExecutor(c), incidentIds)
+	updates, err := transactional.IncidentUpdateRepository.FindByIncidentIds(db.MainExecutor(ctx), incidentIds)
 	if err != nil {
 		return nil, err
 	}

@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/tracewayapp/traceway/backend/app/db"
