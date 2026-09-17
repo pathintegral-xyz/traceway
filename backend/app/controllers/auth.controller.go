@@ -236,6 +236,11 @@ func (a authController) Register(c *gin.Context) {
 }
 
 func (a authController) LoginBundle(c *gin.Context) {
+	if db.IsCloudflare() {
+		a.loginBundleCloudflare(c)
+		return
+	}
+
 	tx := db.GetTx(c)
 
 	userId := middleware.GetUserId(c)

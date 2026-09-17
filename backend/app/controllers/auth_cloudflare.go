@@ -49,6 +49,34 @@ func (a authController) loginCloudflare(c *gin.Context, request models.LoginRequ
 	})
 }
 
+func (a authController) loginBundleCloudflare(c *gin.Context) {
+	userID := middleware.GetUserId(c)
+	if userID == 0 {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	user, err := transactional.UserRepository.FindById(db.DB, userID)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("login bundle: load user: %w", err))
+		return
+	}
+	if user == nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	projects, err := transactional.ProjectRepository.FindAllWithBackendUrlByUserId(db.DB, user.Id)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("login bundle: load projects: %w", err))
+		return
+	}
+	organizations, err := transactional.OrganizationRepository.FindByUserIdWithRoles(db.DB, user.Id)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("login bundle: load organizations: %w", err))
+		return
+	}
+	c.JSON(http.StatusOK, &models.LoginResponse{User: user.ToResponse(), Projects: projects, Organizations: organizations})
+}
+
 // registerCloudflare is the finite D1 equivalent of the native registration
 // transaction. D1 batches execute the whole write set atomically, while reads
 // after the batch use the normal database/sql connector.

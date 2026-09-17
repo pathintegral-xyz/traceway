@@ -32,7 +32,7 @@ func (r *userRepository) FindByEmailIgnoreCase(tx *sql.Tx, email string) (*model
 	)
 }
 
-func (r *userRepository) FindById(tx *sql.Tx, id int) (*models.User, error) {
+func (r *userRepository) FindById(tx lit.Executor, id int) (*models.User, error) {
 	return lit.SelectSingleNamed[models.User](
 		tx,
 		"SELECT "+userColumns+" FROM users WHERE id = :id",
