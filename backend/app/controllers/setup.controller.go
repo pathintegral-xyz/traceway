@@ -43,7 +43,7 @@ type SetupSessionResponse struct {
 }
 
 func (s setupController) GetSession(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	orgId := middleware.GetSetupOrganizationId(ctx)
 
 	org, err := transactional.OrganizationRepository.FindById(tx, orgId)
@@ -158,7 +158,7 @@ type setupPlanResultItem struct {
 }
 
 func resolvePlanResultProjects(ctx *gin.Context, plan *transactional.SetupPlanRow) ([]BatchProjectResponseItem, bool) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	var resultItems []setupPlanResultItem
 	if plan.Result != "" {
@@ -192,7 +192,7 @@ func resolvePlanResultProjects(ctx *gin.Context, plan *transactional.SetupPlanRo
 }
 
 func (s setupController) GetPlan(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	plan, err := transactional.SetupPlanRepository.FindLatestByUserAndOrganization(tx, middleware.GetUserId(ctx), middleware.GetSetupOrganizationId(ctx))
 	if err != nil {
@@ -260,7 +260,7 @@ func (s setupController) ListDraft(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	if !requireOrgWrite(ctx, tx, orgId) {
 		return
 	}

@@ -190,7 +190,7 @@ func loadDashboardForUser(ctx *gin.Context, tx lit.Executor, requireWrite bool) 
 	return dashboard
 }
 
-func requireOrgWrite(ctx *gin.Context, tx *sql.Tx, organizationId int) bool {
+func requireOrgWrite(ctx *gin.Context, tx lit.Executor, organizationId int) bool {
 	userId := middleware.GetUserId(ctx)
 	role, err := transactional.OrganizationRepository.GetUserRole(tx, organizationId, userId)
 	if err != nil {
