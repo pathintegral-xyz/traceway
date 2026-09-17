@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -140,9 +139,7 @@ func (c *metricQueryController) Query(ctx *gin.Context) {
 	defer cancel()
 
 	unitMap := make(map[string]string)
-	registry, regErr := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.MetricRegistry, error) {
-		return transactional.MetricRegistryRepository.FindByProject(tx, projectId)
-	})
+	registry, regErr := transactional.MetricRegistryRepository.FindByProject(db.MainExecutor(ctx), projectId)
 	if regErr != nil {
 		traceway.CaptureException(fmt.Errorf("failed to load metric registry for query: %w", regErr))
 	}
@@ -245,9 +242,7 @@ func (c *metricQueryController) Discover(ctx *gin.Context) {
 		return
 	}
 
-	registry, regErr := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.MetricRegistry, error) {
-		return transactional.MetricRegistryRepository.FindByProject(tx, projectId)
-	})
+	registry, regErr := transactional.MetricRegistryRepository.FindByProject(db.MainExecutor(ctx), projectId)
 
 	if regErr != nil {
 		traceway.CaptureException(fmt.Errorf("failed to load metric registry for discover: %w", regErr))
@@ -312,16 +307,16 @@ func (c *metricQueryController) DiscoverOrg(ctx *gin.Context) {
 	}
 
 	userId := middleware.GetUserId(ctx)
-	projects, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
-		role, err := transactional.OrganizationRepository.GetUserRole(tx, organizationId, userId)
-		if err != nil {
-			return nil, err
-		}
-		if role == "" {
-			return nil, nil
-		}
-		return transactional.ProjectRepository.FindByOrganizationId(tx, organizationId)
-	})
+	executor := db.MainExecutor(ctx)
+	role, err := transactional.OrganizationRepository.GetUserRole(executor, organizationId, userId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list organization projects: %w", err))
+		return
+	}
+	var projects []*models.Project
+	if role != "" {
+		projects, err = transactional.ProjectRepository.FindByOrganizationId(executor, organizationId)
+	}
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list organization projects: %w", err))
 		return
@@ -425,8 +420,9 @@ func (c *metricQueryController) UpdateRegistry(ctx *gin.Context) {
 		return
 	}
 
-	updated, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.MetricRegistry, error) {
-		entry, err := transactional.MetricRegistryRepository.FindByProjectAndName(tx, projectId, req.Name)
+	executor := db.MainExecutor(ctx)
+	updated, err := func() (*models.MetricRegistry, error) {
+		entry, err := transactional.MetricRegistryRepository.FindByProjectAndName(executor, projectId, req.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -440,11 +436,11 @@ func (c *metricQueryController) UpdateRegistry(ctx *gin.Context) {
 			entry.Unit = req.Unit
 		}
 		entry.Description = req.Description
-		if err := transactional.MetricRegistryRepository.Update(tx, entry); err != nil {
+		if err := transactional.MetricRegistryRepository.Update(executor, entry); err != nil {
 			return nil, err
 		}
 		return entry, nil
-	})
+	}()
 
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to update metric registry: %w", err))

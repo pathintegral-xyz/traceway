@@ -114,9 +114,7 @@ func (c *invitationController) InviteUser(ctx *gin.Context) {
 func (c *invitationController) ListInvitations(ctx *gin.Context) {
 	organizationId := middleware.GetOrganizationId(ctx)
 
-	invitations, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.InvitationWithInviter, error) {
-		return transactional.InvitationRepository.FindByOrganization(tx, organizationId)
-	})
+	invitations, err := transactional.InvitationRepository.FindByOrganization(db.MainExecutor(ctx), organizationId)
 
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("Failed to load invitations: %w", err))
@@ -169,8 +167,9 @@ func (c *invitationController) GetInvitationInfo(ctx *gin.Context) {
 		UserExists bool
 	}
 
-	data, err := db.ExecuteTransaction(func(tx *sql.Tx) (*invitationInfo, error) {
-		invitation, err := transactional.InvitationRepository.FindByToken(tx, token)
+	executor := db.MainExecutor(ctx)
+	data, err := func() (*invitationInfo, error) {
+		invitation, err := transactional.InvitationRepository.FindByToken(executor, token)
 		if err != nil {
 			return nil, err
 		}
@@ -178,17 +177,17 @@ func (c *invitationController) GetInvitationInfo(ctx *gin.Context) {
 			return nil, nil
 		}
 
-		org, err := transactional.OrganizationRepository.FindById(tx, invitation.OrganizationId)
+		org, err := transactional.OrganizationRepository.FindById(executor, invitation.OrganizationId)
 		if err != nil {
 			return nil, err
 		}
 
-		inviter, err := transactional.UserRepository.FindById(tx, invitation.InvitedBy)
+		inviter, err := transactional.UserRepository.FindById(executor, invitation.InvitedBy)
 		if err != nil {
 			return nil, err
 		}
 
-		userExists, err := transactional.UserRepository.EmailExists(tx, invitation.Email)
+		userExists, err := transactional.UserRepository.EmailExists(executor, invitation.Email)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +198,7 @@ func (c *invitationController) GetInvitationInfo(ctx *gin.Context) {
 			Inviter:    inviter,
 			UserExists: userExists,
 		}, nil
-	})
+	}()
 
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("Failed to load invitation: %w", err))

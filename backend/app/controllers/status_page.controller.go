@@ -436,9 +436,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 			day.MaxLatencyMs = 0
 		}
 
-		incidents, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.CheckIncident, error) {
-			return transactional.CheckIncidentRepository.FindByCheckSince(tx, check.Id, from)
-		})
+		incidents, err := transactional.CheckIncidentRepository.FindByCheckSince(db.MainExecutor(c), check.Id, from)
 		if err != nil {
 			return nil, err
 		}
@@ -467,9 +465,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 		})
 	}
 
-	manualIncidents, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.CheckIncident, error) {
-		return transactional.CheckIncidentRepository.FindByStatusPageSince(tx, loaded.page.Id, from)
-	})
+	manualIncidents, err := transactional.CheckIncidentRepository.FindByStatusPageSince(db.MainExecutor(c), loaded.page.Id, from)
 	if err != nil {
 		return nil, err
 	}
@@ -489,9 +485,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 	for i, source := range pastIncidents {
 		incidentIds[i] = source.incident.Id
 	}
-	updates, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.IncidentUpdate, error) {
-		return transactional.IncidentUpdateRepository.FindByIncidentIds(tx, incidentIds)
-	})
+	updates, err := transactional.IncidentUpdateRepository.FindByIncidentIds(db.MainExecutor(c), incidentIds)
 	if err != nil {
 		return nil, err
 	}
@@ -578,9 +572,7 @@ func (ctrl *statusPageController) UploadLogo(ctx *gin.Context) {
 // PublicLogo streams the logo of a public status page.
 func (ctrl *statusPageController) PublicLogo(ctx *gin.Context) {
 	slug := strings.ToLower(ctx.Param("slug"))
-	page, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.StatusPage, error) {
-		return transactional.StatusPageRepository.FindPublicBySlug(tx, slug)
-	})
+	page, err := transactional.StatusPageRepository.FindPublicBySlug(db.MainExecutor(ctx), slug)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load status page: %w", err))
 		return
@@ -611,9 +603,7 @@ func (ctrl *statusPageController) ResolveHost(ctx *gin.Context) {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
-	page, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.StatusPage, error) {
-		return transactional.StatusPageRepository.FindPublicByCustomDomain(tx, host)
-	})
+	page, err := transactional.StatusPageRepository.FindPublicByCustomDomain(db.MainExecutor(ctx), host)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to resolve status host: %w", err))
 		return
