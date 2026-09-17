@@ -104,7 +104,7 @@ func (p *projectRepository) FindAllWithBackendUrlByUserId(tx lit.Executor, userI
 	return result, nil
 }
 
-func (p *projectRepository) GetEffectiveRole(tx *sql.Tx, projectId uuid.UUID, userId int) (string, error) {
+func (p *projectRepository) GetEffectiveRole(tx lit.Executor, projectId uuid.UUID, userId int) (string, error) {
 	row, err := lit.SelectSingleNamed[effectiveRoleRow](
 		tx,
 		`SELECT ou.role as org_role, pur.role as override_role
