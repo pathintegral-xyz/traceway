@@ -391,9 +391,7 @@ func (p projectController) GenerateSourceMapToken(c *gin.Context) {
 		return
 	}
 
-	token, err := db.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
-		return transactional.ProjectRepository.GenerateSourceMapToken(tx, projectId)
-	})
+	token, err := transactional.ProjectRepository.GenerateSourceMapToken(db.MainExecutor(c), projectId)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to generate source map token: %w", err))
 		return
