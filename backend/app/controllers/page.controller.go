@@ -1,12 +1,12 @@
 package controllers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -52,7 +52,7 @@ func toPageResponse(page *models.Page, names map[int]string) pageResponse {
 // memberNames maps the organization's member ids to display names; users no
 // longer in the organization simply stay absent (the frontend falls back to
 // "user #id").
-func memberNames(tx *sql.Tx, organizationId int) (map[int]string, error) {
+func memberNames(tx lit.Executor, organizationId int) (map[int]string, error) {
 	members, err := transactional.OrganizationRepository.GetMembersWithDetails(tx, organizationId)
 	if err != nil {
 		return nil, err
@@ -129,7 +129,7 @@ func (c *pageController) List(ctx *gin.Context) {
 }
 
 func (c *pageController) Get(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	page, ok := c.loadPage(ctx)
 	if !ok {
 		return
@@ -420,7 +420,7 @@ func (c *pageController) OpenCount(ctx *gin.Context) {
 }
 
 func (c *pageController) loadPage(ctx *gin.Context) (*models.Page, bool) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))

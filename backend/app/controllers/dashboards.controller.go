@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -154,7 +155,7 @@ func validateDefinitionWidgets(def *models.DashboardDefinition) string {
 	return ""
 }
 
-func loadDashboardForUser(ctx *gin.Context, tx *sql.Tx, requireWrite bool) *models.Dashboard {
+func loadDashboardForUser(ctx *gin.Context, tx lit.Executor, requireWrite bool) *models.Dashboard {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -545,7 +546,7 @@ func (c *dashboardsController) Create(ctx *gin.Context) {
 }
 
 func (c *dashboardsController) Get(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, false)
 	if dashboard == nil {
