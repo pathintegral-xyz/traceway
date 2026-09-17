@@ -98,7 +98,7 @@ func (r *organizationRepository) AddUser(tx *sql.Tx, organizationId int, userId 
 	return orgUser, nil
 }
 
-func (r *organizationRepository) GetUserRole(tx *sql.Tx, organizationId int, userId int) (string, error) {
+func (r *organizationRepository) GetUserRole(tx lit.Executor, organizationId int, userId int) (string, error) {
 	orgUser, err := lit.SelectSingleNamed[models.OrganizationUser](
 		tx,
 		"SELECT id, user_id, organization_id, role, created_at FROM organization_users WHERE organization_id = :org_id AND user_id = :user_id",

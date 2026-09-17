@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"database/sql"
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional"
 	"net/http"
@@ -30,9 +29,7 @@ func InitRequireProjectAccess() {
 			return
 		}
 
-		hasAccess, err := db.ExecuteTransaction(func(tx *sql.Tx) (bool, error) {
-			return transactional.ProjectRepository.UserHasAccess(tx, projectId, userId)
-		})
+		hasAccess, err := transactional.ProjectRepository.UserHasAccess(db.MainExecutor(c), projectId, userId)
 
 		if err != nil {
 			c.AbortWithError(http.StatusInternalServerError, err)

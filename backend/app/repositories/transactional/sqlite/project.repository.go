@@ -138,7 +138,7 @@ func (p *projectRepository) FindByToken(tx *sql.Tx, token string) (*models.Proje
 	)
 }
 
-func (p *projectRepository) FindById(tx *sql.Tx, id uuid.UUID) (*models.Project, error) {
+func (p *projectRepository) FindById(tx lit.Executor, id uuid.UUID) (*models.Project, error) {
 	return lit.SelectSingleNamed[models.Project](
 		tx,
 		"SELECT id, name, token, framework, organization_id, created_at, source_map_token, drop_healthy_healthchecks, healthcheck_paths, profile_label_allowlist, ai_flagged_terms, ai_flagged_languages FROM projects WHERE id = :id",
@@ -218,7 +218,7 @@ func (p *projectRepository) FindByUserId(tx *sql.Tx, userId int) ([]*models.Proj
 	)
 }
 
-func (p *projectRepository) UserHasAccess(tx *sql.Tx, projectId uuid.UUID, userId int) (bool, error) {
+func (p *projectRepository) UserHasAccess(tx lit.Executor, projectId uuid.UUID, userId int) (bool, error) {
 	result, err := lit.SelectSingleNamed[models.CountResult](
 		tx,
 		`SELECT COUNT(*) as count

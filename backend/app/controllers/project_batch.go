@@ -45,7 +45,7 @@ func validateProjectName(name string) string {
 	return ""
 }
 
-const invalidFrameworkMessage = "Framework must be one of: gin, fiber, chi, fasthttp, stdlib, custom, react, svelte, vuejs, jquery, react-native, hono, cloudflare, opentelemetry, symfony, laravel, django, flutter, android, ios"
+const invalidFrameworkMessage = "Framework must be one of: gin, fiber, chi, fasthttp, stdlib, custom, react, svelte, vuejs, nextjs, nestjs, express, remix, jquery, react-native, hono, cloudflare, opentelemetry, symfony, laravel, django, flutter, android, ios"
 
 func batchCreateProjects(tx *sql.Tx, orgId int, createdBy int, inputs []BatchProjectInput) ([]BatchProjectResult, error) {
 	if len(inputs) == 0 {
