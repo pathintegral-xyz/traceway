@@ -9,7 +9,7 @@ func cloudflareTransactionMode(_ string, path string) transactionMode {
 	switch path {
 	case "/api/login", "/api/register", "/api/projects/batch":
 		return transactionCommand
-	case "/api/me/login-bundle", "/api/dashboards", "/api/has-organizations":
+	case "/api/me/login-bundle", "/api/dashboards", "/api/dashboards/library", "/api/dashboards/starred", "/api/notification-channels", "/api/notification-rules", "/api/synthetics/checks", "/api/synthetics/open-count", "/api/post-mortems", "/api/post-mortems/:id", "/api/post-mortems/:id/activity", "/api/pages/open-count", "/api/contact-methods", "/api/user-notification-rules", "/api/has-organizations":
 		return transactionRead
 	default:
 		return transactionRequired

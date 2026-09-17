@@ -405,7 +405,7 @@ func (c *pageController) UnresolvedForIssues(ctx *gin.Context) {
 }
 
 func (c *pageController) OpenCount(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))

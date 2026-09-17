@@ -35,7 +35,7 @@ type notificationRuleChains struct {
 }
 
 func (c *userNotificationRuleController) Get(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 
 	rules, err := transactional.UserNotificationRuleRepository.FindByUser(tx, userId)

@@ -314,7 +314,7 @@ type LibraryOrganization struct {
 
 func (c *dashboardsController) Library(ctx *gin.Context) {
 	userId := middleware.GetUserId(ctx)
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	orgs, err := transactional.OrganizationRepository.FindByUserId(tx, userId)
 	if err != nil {

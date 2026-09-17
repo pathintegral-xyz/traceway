@@ -146,7 +146,7 @@ func (ctrl *syntheticCheckController) List(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	checks, err := transactional.SyntheticCheckRepository.FindByProject(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list synthetic checks: %w", err))
@@ -607,7 +607,7 @@ func (ctrl *syntheticCheckController) OpenCount(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
 		return
 	}
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	count, err := transactional.SyntheticCheckRepository.CountDownByProject(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to count down checks: %w", err))

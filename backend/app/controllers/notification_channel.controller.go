@@ -29,7 +29,7 @@ func (ctrl *notificationChannelController) List(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	channels, err := transactional.NotificationChannelRepository.FindByProject(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list notification channels: %w", err))

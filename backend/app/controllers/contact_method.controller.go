@@ -133,7 +133,7 @@ func respondBeginVerificationError(ctx *gin.Context, err error, reason string) {
 }
 
 func (c *contactMethodController) List(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 	methods, err := transactional.UserContactMethodRepository.FindByUser(tx, userId)
 	if err != nil {

@@ -48,7 +48,7 @@ func (ctrl *notificationRuleController) List(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	rules, err := transactional.NotificationRuleRepository.FindByProjectWithChannel(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list notification rules: %w", err))

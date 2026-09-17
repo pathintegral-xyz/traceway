@@ -359,7 +359,7 @@ func (c *dashboardsController) ListStarred(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	starred, err := transactional.DashboardRepository.FindStarredByProject(tx, projectId)
 	if err != nil {
