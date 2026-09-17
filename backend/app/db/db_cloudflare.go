@@ -66,6 +66,6 @@ func openD1(databaseID string) (*sql.DB, *d1http.Connector, error) {
 
 // Like the SQLite deployment, this only preserves the local cache contract.
 // Cross-instance cache invalidation remains a separate Cloudflare migration.
-func NotifyProjectCacheChanged(*sql.Tx, uuid.UUID) error {
+func NotifyProjectCacheChanged(lit.Executor, uuid.UUID) error {
 	return nil
 }

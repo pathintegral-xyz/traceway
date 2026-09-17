@@ -3,8 +3,6 @@
 package db
 
 import (
-	"database/sql"
-
 	"github.com/google/uuid"
 	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/config"
@@ -31,6 +29,6 @@ func initMainDB() error {
 	return nil
 }
 
-func NotifyProjectCacheChanged(*sql.Tx, uuid.UUID) error {
+func NotifyProjectCacheChanged(lit.Executor, uuid.UUID) error {
 	return nil
 }
