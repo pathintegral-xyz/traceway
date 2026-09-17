@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/tracewayapp/traceway/backend/app/cache"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/lit/v2"
 )
 
 // Valid framework values
@@ -172,7 +172,7 @@ func (p projectController) CreateProject(c *gin.Context) {
 
 	userId := middleware.GetUserId(c)
 	var creatorRole string
-	project, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error) {
+	project, err := db.ExecuteTransaction(func(tx lit.Executor) (*models.Project, error) {
 		currentProject, err := transactional.ProjectRepository.FindById(tx, projectId)
 		if err != nil {
 			return nil, err
@@ -327,7 +327,7 @@ func (p projectController) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	project, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error) {
+	project, err := db.ExecuteTransaction(func(tx lit.Executor) (*models.Project, error) {
 		return transactional.ProjectRepository.Update(tx, projectId, request.Name, request.Framework, request.DropHealthyHealthchecks, healthcheckPaths, profileLabelAllowlist, aiFlaggedTerms, aiFlaggedLanguages)
 	})
 	if err != nil {
@@ -353,7 +353,7 @@ func (p projectController) DeleteProject(c *gin.Context) {
 		return
 	}
 
-	nameMatched, err := db.ExecuteTransaction(func(tx *sql.Tx) (bool, error) {
+	nameMatched, err := db.ExecuteTransaction(func(tx lit.Executor) (bool, error) {
 		project, err := transactional.ProjectRepository.FindById(tx, projectId)
 		if err != nil {
 			return false, err
@@ -393,7 +393,7 @@ func (p projectController) GenerateSourceMapToken(c *gin.Context) {
 		return
 	}
 
-	token, err := db.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
+	token, err := db.ExecuteTransaction(func(tx lit.Executor) (string, error) {
 		return transactional.ProjectRepository.GenerateSourceMapToken(tx, projectId)
 	})
 	if err != nil {

@@ -146,7 +146,7 @@ func (ctrl *syntheticCheckController) List(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	checks, err := transactional.SyntheticCheckRepository.FindByProject(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list synthetic checks: %w", err))
@@ -184,7 +184,7 @@ func (ctrl *syntheticCheckController) Overview(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	checks, err := transactional.SyntheticCheckRepository.FindByProject(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list synthetic checks: %w", err))
@@ -245,7 +245,7 @@ func (ctrl *syntheticCheckController) Create(ctx *gin.Context) {
 		UpdatedAt:        now,
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	if CheckLimitHook != nil {
 		project, err := transactional.ProjectRepository.FindById(tx, projectId)
 		if err != nil {
@@ -278,7 +278,7 @@ func (ctrl *syntheticCheckController) Get(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	check, err := transactional.SyntheticCheckRepository.FindByIdForProject(tx, checkId, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load synthetic check: %w", err))
@@ -332,7 +332,7 @@ func (ctrl *syntheticCheckController) Update(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	check, err := transactional.SyntheticCheckRepository.FindByIdForProject(tx, checkId, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load synthetic check: %w", err))
@@ -385,7 +385,7 @@ func (ctrl *syntheticCheckController) Delete(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	check, err := transactional.SyntheticCheckRepository.FindByIdForProject(tx, checkId, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load synthetic check: %w", err))
@@ -424,7 +424,7 @@ func (ctrl *syntheticCheckController) RunNow(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	check, err := transactional.SyntheticCheckRepository.FindByIdForProject(tx, checkId, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load synthetic check: %w", err))
@@ -607,7 +607,7 @@ func (ctrl *syntheticCheckController) OpenCount(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
 		return
 	}
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	count, err := transactional.SyntheticCheckRepository.CountDownByProject(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to count down checks: %w", err))

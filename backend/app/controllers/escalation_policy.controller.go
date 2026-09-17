@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/lit/v2"
 )
 
 type escalationPolicyController struct{}
@@ -30,7 +30,7 @@ type escalationPolicyRequest struct {
 // ListForProject serves the channel-dialog picker and the on-call page: all
 // policies of the project's organization, readable by any project member.
 func (c *escalationPolicyController) ListForProject(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
@@ -57,7 +57,7 @@ func (c *escalationPolicyController) ListForProject(ctx *gin.Context) {
 }
 
 func (c *escalationPolicyController) ListForOrganization(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	policies, err := transactional.EscalationPolicyRepository.FindByOrganization(tx, organizationId)
 	if err != nil {
@@ -71,7 +71,7 @@ func (c *escalationPolicyController) ListForOrganization(ctx *gin.Context) {
 }
 
 func (c *escalationPolicyController) Create(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	userId := middleware.GetUserId(ctx)
 
@@ -124,7 +124,7 @@ func (c *escalationPolicyController) Create(ctx *gin.Context) {
 }
 
 func (c *escalationPolicyController) Update(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	policy, ok := c.loadPolicy(ctx, organizationId)
@@ -172,7 +172,7 @@ func (c *escalationPolicyController) Update(ctx *gin.Context) {
 }
 
 func (c *escalationPolicyController) Delete(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	policy, ok := c.loadPolicy(ctx, organizationId)
@@ -199,7 +199,7 @@ func (c *escalationPolicyController) Delete(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "Escalation policy deleted"})
 }
 
-func (c *escalationPolicyController) findReferencingChannels(tx *sql.Tx, organizationId int, policyId int) ([]string, error) {
+func (c *escalationPolicyController) findReferencingChannels(tx lit.Executor, organizationId int, policyId int) ([]string, error) {
 	channels, err := transactional.NotificationChannelRepository.FindEscalationByOrganization(tx, organizationId)
 	if err != nil {
 		return nil, err
@@ -214,7 +214,7 @@ func (c *escalationPolicyController) findReferencingChannels(tx *sql.Tx, organiz
 }
 
 func (c *escalationPolicyController) loadPolicy(ctx *gin.Context, organizationId int) (*models.EscalationPolicy, bool) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	policyId, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid policy ID"})

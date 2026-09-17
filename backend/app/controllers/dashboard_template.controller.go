@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/lit/v2"
 )
 
 type dashboardTemplateController struct{}
@@ -32,7 +32,7 @@ type DashboardTemplateListItem struct {
 }
 
 func (c *dashboardTemplateController) List(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	templates, err := transactional.DashboardTemplateRepository.FindAll(tx)
 	if err != nil {
@@ -91,7 +91,7 @@ var errTemplateInvalid = errors.New("invalid dashboard template")
 
 var errDashboardNameTaken = errors.New("dashboard name already exists")
 
-func installDashboardTemplateTx(tx *sql.Tx, template *models.DashboardTemplate, organizationId int, createdBy *int) (*models.Dashboard, error) {
+func installDashboardTemplateTx(tx lit.Executor, template *models.DashboardTemplate, organizationId int, createdBy *int) (*models.Dashboard, error) {
 	def, err := dashboardsvc.ParseDefinition(template.Definition)
 	if err != nil {
 		return nil, traceway.NewStackTraceErrorf("failed to parse template %s definition: %w (%w)", template.Key, err, errTemplateInvalid)
@@ -140,7 +140,7 @@ func installDashboardTemplateTx(tx *sql.Tx, template *models.DashboardTemplate, 
 	return dashboard, nil
 }
 
-func installDashboardTemplate(ctx *gin.Context, tx *sql.Tx, template *models.DashboardTemplate, organizationId int) *models.Dashboard {
+func installDashboardTemplate(ctx *gin.Context, tx lit.Executor, template *models.DashboardTemplate, organizationId int) *models.Dashboard {
 	userId := middleware.GetUserId(ctx)
 	var createdBy *int
 	if userId > 0 {
@@ -159,7 +159,7 @@ func installDashboardTemplate(ctx *gin.Context, tx *sql.Tx, template *models.Das
 	return dashboard
 }
 
-func populateDefaultDashboards(tx *sql.Tx, project *models.Project, createdBy *int) error {
+func populateDefaultDashboards(tx lit.Executor, project *models.Project, createdBy *int) error {
 	if project.OrganizationId == nil {
 		return nil
 	}
@@ -220,7 +220,7 @@ func (c *dashboardTemplateController) Install(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	template, err := transactional.DashboardTemplateRepository.FindByKey(tx, ctx.Param("key"))
 	if err != nil {
@@ -282,7 +282,7 @@ func (c *dashboardsController) PopulateDefaults(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	existing, err := transactional.DashboardRepository.FindAssignmentsByProject(tx, projectId)
 	if err != nil {

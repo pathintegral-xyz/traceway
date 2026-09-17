@@ -132,7 +132,7 @@ func (c *deviceAuthController) Deny(ctx *gin.Context) {
 }
 
 func (c *deviceAuthController) resolve(ctx *gin.Context, approve bool) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 
 	var req models.DeviceApproveRequest

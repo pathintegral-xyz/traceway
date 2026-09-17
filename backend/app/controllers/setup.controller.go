@@ -43,7 +43,7 @@ type SetupSessionResponse struct {
 }
 
 func (s setupController) GetSession(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	orgId := middleware.GetSetupOrganizationId(ctx)
 
 	org, err := transactional.OrganizationRepository.FindById(tx, orgId)
@@ -143,7 +143,7 @@ func (s setupController) SubmitPlan(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	if err := transactional.SetupPlanRepository.Upsert(tx, uuid.New().String(), middleware.GetUserId(ctx), middleware.GetSetupOrganizationId(ctx), string(canonical)); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("store setup plan: %w", err))
 		return
@@ -158,7 +158,7 @@ type setupPlanResultItem struct {
 }
 
 func resolvePlanResultProjects(ctx *gin.Context, plan *transactional.SetupPlanRow) ([]BatchProjectResponseItem, bool) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	var resultItems []setupPlanResultItem
 	if plan.Result != "" {
@@ -192,7 +192,7 @@ func resolvePlanResultProjects(ctx *gin.Context, plan *transactional.SetupPlanRo
 }
 
 func (s setupController) GetPlan(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	plan, err := transactional.SetupPlanRepository.FindLatestByUserAndOrganization(tx, middleware.GetUserId(ctx), middleware.GetSetupOrganizationId(ctx))
 	if err != nil {
@@ -260,7 +260,7 @@ func (s setupController) ListDraft(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	if !requireOrgWrite(ctx, tx, orgId) {
 		return
 	}
@@ -283,7 +283,7 @@ func (s setupController) ListDraft(ctx *gin.Context) {
 }
 
 func (s setupController) loadDecidablePlan(ctx *gin.Context) *transactional.SetupPlanRow {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	plan, err := transactional.SetupPlanRepository.FindById(tx, ctx.Param("id"))
 	if err != nil {
@@ -321,7 +321,7 @@ func (s setupController) ApproveDraft(ctx *gin.Context) {
 		inputs = append(inputs, BatchProjectInput{Name: p.Name, Framework: p.Framework})
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 
 	results, err := batchCreateProjects(tx, plan.OrganizationId, userId, inputs)
@@ -372,7 +372,7 @@ func (s setupController) RejectDraft(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	rows, err := transactional.SetupPlanRepository.Decide(tx, plan.Id, "rejected", reason, "", middleware.GetUserId(ctx), time.Now().UTC())
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("reject setup plan: %w", err))

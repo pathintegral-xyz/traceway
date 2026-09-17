@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/lit/v2"
 )
 
 type pageController struct{}
@@ -52,7 +52,7 @@ func toPageResponse(page *models.Page, names map[int]string) pageResponse {
 // memberNames maps the organization's member ids to display names; users no
 // longer in the organization simply stay absent (the frontend falls back to
 // "user #id").
-func memberNames(tx *sql.Tx, organizationId int) (map[int]string, error) {
+func memberNames(tx lit.Executor, organizationId int) (map[int]string, error) {
 	members, err := transactional.OrganizationRepository.GetMembersWithDetails(tx, organizationId)
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ var validPageStatusFilters = map[string]bool{
 }
 
 func (c *pageController) List(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
@@ -129,7 +129,7 @@ func (c *pageController) List(ctx *gin.Context) {
 }
 
 func (c *pageController) Get(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	page, ok := c.loadPage(ctx)
 	if !ok {
 		return
@@ -160,7 +160,7 @@ func (c *pageController) Get(ctx *gin.Context) {
 // access: acking is incident response, and a paged responder must never be
 // blocked by a readonly role.
 func (c *pageController) Acknowledge(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 	page, ok := c.loadPage(ctx)
 	if !ok {
@@ -188,7 +188,7 @@ type resolvePageRequest struct {
 }
 
 func (c *pageController) Resolve(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 	page, ok := c.loadPage(ctx)
 	if !ok {
@@ -247,7 +247,7 @@ const maxBulkPageIds = 100
 // from other projects or in another state are skipped, not errors: bulk
 // actions race the escalator and other responders by nature.
 func (c *pageController) BulkAcknowledge(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
@@ -298,7 +298,7 @@ type bulkResolveRequest struct {
 // the pages this call transitioned: a page someone else resolved a moment
 // earlier was still selected with the intent to archive its issue.
 func (c *pageController) BulkResolve(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
@@ -376,7 +376,7 @@ type pagesForIssuesRequest struct {
 // UnresolvedForIssues reports how many unresolved pages were opened for the
 // given exception hashes, so the archive dialog can offer resolving them.
 func (c *pageController) UnresolvedForIssues(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
@@ -405,7 +405,7 @@ func (c *pageController) UnresolvedForIssues(ctx *gin.Context) {
 }
 
 func (c *pageController) OpenCount(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
@@ -420,7 +420,7 @@ func (c *pageController) OpenCount(ctx *gin.Context) {
 }
 
 func (c *pageController) loadPage(ctx *gin.Context) (*models.Page, bool) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))

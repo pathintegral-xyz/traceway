@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/tracewayapp/traceway/backend/app/config"
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -15,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/lit/v2"
 )
 
 type passwordResetController struct{}
@@ -28,7 +28,7 @@ func (c *passwordResetController) ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	var request models.ForgotPasswordRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
@@ -78,7 +78,7 @@ func (c *passwordResetController) ValidateToken(ctx *gin.Context) {
 
 	token := ctx.Param("token")
 
-	user, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.User, error) {
+	user, err := db.ExecuteTransaction(func(tx lit.Executor) (*models.User, error) {
 		return transactional.UserRepository.FindByPasswordResetToken(tx, token)
 	})
 
@@ -109,7 +109,7 @@ func (c *passwordResetController) ResetPassword(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	token := ctx.Param("token")
 
 	var request models.ResetPasswordRequest

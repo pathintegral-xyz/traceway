@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/lit/v2"
 )
 
 type invitationController struct{}
@@ -23,7 +23,7 @@ const maxMembersPerOrg = 10
 const invitationExpiryDays = 7
 
 func (c *invitationController) InviteUser(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	userId := middleware.GetUserId(ctx)
 
@@ -114,7 +114,7 @@ func (c *invitationController) InviteUser(ctx *gin.Context) {
 func (c *invitationController) ListInvitations(ctx *gin.Context) {
 	organizationId := middleware.GetOrganizationId(ctx)
 
-	invitations, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.InvitationWithInviter, error) {
+	invitations, err := db.ExecuteTransaction(func(tx lit.Executor) ([]*models.InvitationWithInviter, error) {
 		return transactional.InvitationRepository.FindByOrganization(tx, organizationId)
 	})
 
@@ -127,7 +127,7 @@ func (c *invitationController) ListInvitations(ctx *gin.Context) {
 }
 
 func (c *invitationController) RevokeInvitation(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	invitationId, err := strconv.Atoi(ctx.Param("id"))
@@ -169,7 +169,7 @@ func (c *invitationController) GetInvitationInfo(ctx *gin.Context) {
 		UserExists bool
 	}
 
-	data, err := db.ExecuteTransaction(func(tx *sql.Tx) (*invitationInfo, error) {
+	data, err := db.ExecuteTransaction(func(tx lit.Executor) (*invitationInfo, error) {
 		invitation, err := transactional.InvitationRepository.FindByToken(tx, token)
 		if err != nil {
 			return nil, err
@@ -231,7 +231,7 @@ func (c *invitationController) GetInvitationInfo(ctx *gin.Context) {
 }
 
 func (c *invitationController) AcceptInvitation(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	token := ctx.Param("token")
 
 	var request models.AcceptInvitationRequest
@@ -318,7 +318,7 @@ func (c *invitationController) AcceptInvitation(ctx *gin.Context) {
 }
 
 func (c *invitationController) AcceptExistingUser(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	token := ctx.Param("token")
 	userId := middleware.GetUserId(ctx)
 	userEmail := middleware.GetUserEmail(ctx)

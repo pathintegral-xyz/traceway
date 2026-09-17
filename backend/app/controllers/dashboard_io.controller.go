@@ -34,7 +34,7 @@ func exportDashboard(ctx *gin.Context, dashboard *models.Dashboard) (*models.Das
 }
 
 func (c *dashboardsController) Export(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	dashboard := loadDashboardForUser(ctx, tx, false)
 	if dashboard == nil {
@@ -55,7 +55,7 @@ func (c *dashboardsController) ExportOrganization(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	userId := middleware.GetUserId(ctx)
 	role, err := transactional.OrganizationRepository.GetUserRole(tx, organizationId, userId)
@@ -136,7 +136,7 @@ func (c *dashboardsController) Import(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	organizationId, ok := resolveTargetOrganization(ctx, tx, req.OrganizationId)
 	if !ok {
@@ -293,7 +293,7 @@ func (c *dashboardsController) ImportGrafana(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	organizationId, ok := resolveTargetOrganization(ctx, tx, req.OrganizationId)
 	if !ok {

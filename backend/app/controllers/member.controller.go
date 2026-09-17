@@ -18,7 +18,7 @@ import (
 type memberController struct{}
 
 func (c *memberController) UpdateRole(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	currentUserId := middleware.GetUserId(ctx)
 	currentUserRole := middleware.GetUserOrgRole(ctx)
@@ -75,7 +75,7 @@ func (c *memberController) UpdateRole(ctx *gin.Context) {
 }
 
 func (c *memberController) RemoveMember(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	currentUserId := middleware.GetUserId(ctx)
 
@@ -139,7 +139,7 @@ func (c *memberController) RemoveMember(ctx *gin.Context) {
 }
 
 func (c *memberController) GetProjectRoles(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	targetUserId, err := strconv.Atoi(ctx.Param("userId"))
@@ -171,7 +171,7 @@ func (c *memberController) GetProjectRoles(ctx *gin.Context) {
 }
 
 func (c *memberController) UpdateProjectRole(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	targetUserId, err := strconv.Atoi(ctx.Param("userId"))

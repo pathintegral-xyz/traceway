@@ -35,7 +35,7 @@ type notificationRuleChains struct {
 }
 
 func (c *userNotificationRuleController) Get(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 
 	rules, err := transactional.UserNotificationRuleRepository.FindByUser(tx, userId)
@@ -57,7 +57,7 @@ func (c *userNotificationRuleController) Get(ctx *gin.Context) {
 
 // Put replaces both chains atomically; positions come from array order.
 func (c *userNotificationRuleController) Put(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 
 	var request notificationRuleChains

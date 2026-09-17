@@ -26,7 +26,7 @@ func (s setupTokenController) Create(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	userId := middleware.GetUserId(ctx)
 
 	if !requireOrgWrite(ctx, tx, req.OrganizationId) {

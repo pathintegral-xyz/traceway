@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"github.com/tracewayapp/traceway/backend/app/cache"
 	"github.com/tracewayapp/traceway/backend/app/config"
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -13,9 +12,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/lit/v2"
 )
 
-var PostRegistrationHooks []func(tx *sql.Tx, org *models.Organization, user *models.User) error
+var PostRegistrationHooks []func(tx lit.Executor, org *models.Organization, user *models.User) error
 
 const passwordLoginDisabledMessage = "Password login is disabled. Please use SSO to sign in."
 

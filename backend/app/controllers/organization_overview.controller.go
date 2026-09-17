@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"math"
 	"net/http"
@@ -20,6 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/lit/v2"
 )
 
 type organizationOverviewController struct{}
@@ -32,7 +32,7 @@ const orgOverviewMaxIssueFetch = 1000
 // transaction: the fan-out handlers run their telemetry queries outside any
 // tx so the single-connection SQLite main DB is never held across them.
 func orgOverviewProjects(organizationId int) ([]*models.Project, error) {
-	projects, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
+	projects, err := db.ExecuteTransaction(func(tx lit.Executor) ([]*models.Project, error) {
 		return transactional.ProjectRepository.FindByOrganizationId(tx, organizationId)
 	})
 	if err != nil {
@@ -66,7 +66,7 @@ type orgServerRow struct {
 }
 
 func orgServerDashboardIds(organizationId int) (map[uuid.UUID]int, error) {
-	return db.ExecuteTransaction(func(tx *sql.Tx) (map[uuid.UUID]int, error) {
+	return db.ExecuteTransaction(func(tx lit.Executor) (map[uuid.UUID]int, error) {
 		dashboards, err := transactional.DashboardRepository.FindByOrganization(tx, organizationId)
 		if err != nil {
 			return nil, err
@@ -532,7 +532,7 @@ type orgPagesRequest struct {
 }
 
 func (c *organizationOverviewController) Pages(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	var request orgPagesRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
@@ -602,7 +602,7 @@ func (c *organizationOverviewController) Pages(ctx *gin.Context) {
 }
 
 func (c *organizationOverviewController) Counts(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	openCount, err := transactional.PageRepository.CountByOrganization(tx, organizationId, models.PageStatusOpen)
 	if err != nil {
@@ -625,7 +625,7 @@ type orgIncidentsRequest struct {
 }
 
 func (c *organizationOverviewController) Incidents(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	var request orgIncidentsRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
@@ -671,7 +671,7 @@ func (c *organizationOverviewController) Monitors(ctx *gin.Context) {
 		projects []*models.Project
 		checks   []*models.SyntheticCheck
 	}
-	data, err := db.ExecuteTransaction(func(tx *sql.Tx) (*orgMonitorsData, error) {
+	data, err := db.ExecuteTransaction(func(tx lit.Executor) (*orgMonitorsData, error) {
 		projects, err := transactional.ProjectRepository.FindByOrganizationId(tx, organizationId)
 		if err != nil {
 			return nil, err
