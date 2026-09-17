@@ -41,7 +41,7 @@ type scheduleUserInfo struct {
 }
 
 func (c *oncallController) ListSchedules(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	schedules, err := transactional.OncallScheduleRepository.ListByOrganization(tx, organizationId)
@@ -93,7 +93,7 @@ func (c *oncallController) CreateSchedule(ctx *gin.Context) {
 }
 
 func (c *oncallController) GetSchedule(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	schedule, ok := c.loadSchedule(ctx, organizationId)
@@ -174,7 +174,7 @@ func (c *oncallController) DeleteSchedule(ctx *gin.Context) {
 }
 
 func (c *oncallController) Timeline(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	schedule, ok := c.loadSchedule(ctx, organizationId)
@@ -363,7 +363,7 @@ func (c *oncallController) DeleteOverride(ctx *gin.Context) {
 // Now is the org-wide overview: per team, per schedule, who is on call and who
 // is next.
 func (c *oncallController) Now(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	teams, err := transactional.TeamRepository.ListByOrganization(tx, organizationId)
@@ -459,7 +459,7 @@ func (c *oncallController) Now(ctx *gin.Context) {
 // on-call for the project, consumed by the issue page and the escalation
 // engine's UI.
 func (c *oncallController) Current(ctx *gin.Context) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	projectId, err := middleware.GetProjectId(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
@@ -478,7 +478,7 @@ func (c *oncallController) Current(ctx *gin.Context) {
 }
 
 func (c *oncallController) loadSchedule(ctx *gin.Context, organizationId int) (*models.OncallSchedule, bool) {
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	scheduleId, err := strconv.Atoi(ctx.Param("scheduleId"))
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule ID"})

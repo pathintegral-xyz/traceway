@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional"
 	traceway "go.tracewayapp.com"
@@ -34,7 +35,7 @@ type ProjectOnCall struct {
 // instant, filtered to current members of the schedule's organization. A
 // missing schedule resolves to nobody rather than an error, so dangling
 // references never abort a caller.
-func CurrentOnCallForSchedule(tx *sql.Tx, scheduleId int, at time.Time) ([]int, error) {
+func CurrentOnCallForSchedule(tx lit.Executor, scheduleId int, at time.Time) ([]int, error) {
 	schedule, err := transactional.OncallScheduleRepository.FindById(tx, scheduleId)
 	if err != nil {
 		return nil, err
@@ -118,7 +119,7 @@ func RemoveUserFromOrgSchedules(tx *sql.Tx, organizationId int, userId int) erro
 // CurrentOnCallForProject resolves the owning team's current on-call across
 // all of its schedules (schedule creation order), filtered to current org
 // members. Returns nil when the project has no owning team.
-func CurrentOnCallForProject(tx *sql.Tx, projectId uuid.UUID, at time.Time) (*ProjectOnCall, error) {
+func CurrentOnCallForProject(tx lit.Executor, projectId uuid.UUID, at time.Time) (*ProjectOnCall, error) {
 	team, err := transactional.TeamRepository.FindTeamForProject(tx, projectId)
 	if err != nil {
 		return nil, err
@@ -155,7 +156,7 @@ func CurrentOnCallForProject(tx *sql.Tx, projectId uuid.UUID, at time.Time) (*Pr
 	return result, nil
 }
 
-func resolveScheduleAt(tx *sql.Tx, schedule *models.OncallSchedule, at time.Time) ([]int, error) {
+func resolveScheduleAt(tx lit.Executor, schedule *models.OncallSchedule, at time.Time) ([]int, error) {
 	tz, err := time.LoadLocation(schedule.Timezone)
 	if err != nil {
 		tz = time.UTC
@@ -176,7 +177,7 @@ func resolveScheduleAt(tx *sql.Tx, schedule *models.OncallSchedule, at time.Time
 	return ResolveAt(def, tz, overrides, at), nil
 }
 
-func memberDetails(tx *sql.Tx, organizationId int) (map[int]*models.OrganizationMember, error) {
+func memberDetails(tx lit.Executor, organizationId int) (map[int]*models.OrganizationMember, error) {
 	members, err := transactional.OrganizationRepository.GetMembersWithDetails(tx, organizationId)
 	if err != nil {
 		return nil, err
