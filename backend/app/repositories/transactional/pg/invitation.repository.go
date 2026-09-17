@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -15,7 +14,7 @@ import (
 
 type invitationRepository struct{}
 
-func (r *invitationRepository) Create(tx *sql.Tx, organizationId int, email string, role string, invitedBy int, expiresAt time.Time) (*models.Invitation, error) {
+func (r *invitationRepository) Create(tx lit.Executor, organizationId int, email string, role string, invitedBy int, expiresAt time.Time) (*models.Invitation, error) {
 	token := uuid.New().String()
 
 	invitation := &models.Invitation{
@@ -38,7 +37,7 @@ func (r *invitationRepository) Create(tx *sql.Tx, organizationId int, email stri
 	return invitation, nil
 }
 
-func (r *invitationRepository) FindByToken(tx *sql.Tx, token string) (*models.Invitation, error) {
+func (r *invitationRepository) FindByToken(tx lit.Executor, token string) (*models.Invitation, error) {
 	return lit.SelectSingleNamed[models.Invitation](
 		tx,
 		`SELECT id, organization_id, email, role, token, invited_by, status, expires_at, accepted_at, created_at
@@ -60,7 +59,7 @@ func (r *invitationRepository) FindByOrganization(tx lit.Executor, organizationI
 	)
 }
 
-func (r *invitationRepository) Update(tx *sql.Tx, invitation *models.Invitation) error {
+func (r *invitationRepository) Update(tx lit.Executor, invitation *models.Invitation) error {
 	return lit.UpdateNamed[models.Invitation](
 		tx,
 		invitation,
@@ -69,11 +68,11 @@ func (r *invitationRepository) Update(tx *sql.Tx, invitation *models.Invitation)
 	)
 }
 
-func (r *invitationRepository) Delete(tx *sql.Tx, id int) error {
+func (r *invitationRepository) Delete(tx lit.Executor, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM invitations WHERE id = :id", lit.P{"id": id})
 }
 
-func (r *invitationRepository) HasPendingInvitation(tx *sql.Tx, email string, organizationId int) (bool, error) {
+func (r *invitationRepository) HasPendingInvitation(tx lit.Executor, email string, organizationId int) (bool, error) {
 	invitation, err := lit.SelectSingleNamed[models.Invitation](
 		tx,
 		`SELECT id, organization_id, email, role, token, invited_by, status, expires_at, accepted_at, created_at
@@ -87,7 +86,7 @@ func (r *invitationRepository) HasPendingInvitation(tx *sql.Tx, email string, or
 	return invitation != nil, nil
 }
 
-func (r *invitationRepository) FindById(tx *sql.Tx, id int) (*models.Invitation, error) {
+func (r *invitationRepository) FindById(tx lit.Executor, id int) (*models.Invitation, error) {
 	return lit.SelectSingleNamed[models.Invitation](
 		tx,
 		`SELECT id, organization_id, email, role, token, invited_by, status, expires_at, accepted_at, created_at

@@ -3,7 +3,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -28,11 +27,11 @@ func incidentIdParams(incidentIds []int) (string, lit.P) {
 	return strings.Join(names, ", "), params
 }
 
-func (r *incidentUpdateRepository) Create(tx *sql.Tx, update *models.IncidentUpdate) (int, error) {
+func (r *incidentUpdateRepository) Create(tx lit.Executor, update *models.IncidentUpdate) (int, error) {
 	return lit.Insert[models.IncidentUpdate](tx, update)
 }
 
-func (r *incidentUpdateRepository) FindByIncident(tx *sql.Tx, incidentId int) ([]*models.IncidentUpdate, error) {
+func (r *incidentUpdateRepository) FindByIncident(tx lit.Executor, incidentId int) ([]*models.IncidentUpdate, error) {
 	return lit.SelectNamed[models.IncidentUpdate](
 		tx,
 		"SELECT "+incidentUpdateColumns+" FROM incident_updates WHERE incident_id = :incident_id ORDER BY created_at DESC, id DESC",
@@ -40,7 +39,7 @@ func (r *incidentUpdateRepository) FindByIncident(tx *sql.Tx, incidentId int) ([
 	)
 }
 
-func (r *incidentUpdateRepository) FindById(tx *sql.Tx, id int) (*models.IncidentUpdate, error) {
+func (r *incidentUpdateRepository) FindById(tx lit.Executor, id int) (*models.IncidentUpdate, error) {
 	return lit.SelectSingleNamed[models.IncidentUpdate](
 		tx,
 		"SELECT "+incidentUpdateColumns+" FROM incident_updates WHERE id = :id",
@@ -48,11 +47,11 @@ func (r *incidentUpdateRepository) FindById(tx *sql.Tx, id int) (*models.Inciden
 	)
 }
 
-func (r *incidentUpdateRepository) Delete(tx *sql.Tx, id int) error {
+func (r *incidentUpdateRepository) Delete(tx lit.Executor, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM incident_updates WHERE id = :id", lit.P{"id": id})
 }
 
-func (r *incidentUpdateRepository) FindByIncidentIds(tx *sql.Tx, incidentIds []int) ([]*models.IncidentUpdate, error) {
+func (r *incidentUpdateRepository) FindByIncidentIds(tx lit.Executor, incidentIds []int) ([]*models.IncidentUpdate, error) {
 	if len(incidentIds) == 0 {
 		return []*models.IncidentUpdate{}, nil
 	}
@@ -64,7 +63,7 @@ func (r *incidentUpdateRepository) FindByIncidentIds(tx *sql.Tx, incidentIds []i
 	)
 }
 
-func (r *incidentUpdateRepository) CountByIncidentIds(tx *sql.Tx, incidentIds []int) (map[int]int, error) {
+func (r *incidentUpdateRepository) CountByIncidentIds(tx lit.Executor, incidentIds []int) (map[int]int, error) {
 	if len(incidentIds) == 0 {
 		return map[int]int{}, nil
 	}

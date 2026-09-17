@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -17,7 +16,7 @@ type teamRepository struct{}
 
 const teamColumns = "id, organization_id, name, description, created_at, updated_at"
 
-func (r *teamRepository) FindById(tx *sql.Tx, id int) (*models.Team, error) {
+func (r *teamRepository) FindById(tx lit.Executor, id int) (*models.Team, error) {
 	return lit.SelectSingleNamed[models.Team](
 		tx,
 		"SELECT "+teamColumns+" FROM teams WHERE id = :id",
@@ -25,7 +24,7 @@ func (r *teamRepository) FindById(tx *sql.Tx, id int) (*models.Team, error) {
 	)
 }
 
-func (r *teamRepository) FindByOrganizationAndName(tx *sql.Tx, organizationId int, name string) (*models.Team, error) {
+func (r *teamRepository) FindByOrganizationAndName(tx lit.Executor, organizationId int, name string) (*models.Team, error) {
 	return lit.SelectSingleNamed[models.Team](
 		tx,
 		"SELECT "+teamColumns+" FROM teams WHERE organization_id = :organization_id AND LOWER(name) = LOWER(:name)",
@@ -33,7 +32,7 @@ func (r *teamRepository) FindByOrganizationAndName(tx *sql.Tx, organizationId in
 	)
 }
 
-func (r *teamRepository) ListByOrganization(tx *sql.Tx, organizationId int) ([]*models.TeamWithCounts, error) {
+func (r *teamRepository) ListByOrganization(tx lit.Executor, organizationId int) ([]*models.TeamWithCounts, error) {
 	return lit.SelectNamed[models.TeamWithCounts](
 		tx,
 		`SELECT t.id, t.organization_id, t.name, t.description, t.created_at, t.updated_at,
@@ -47,19 +46,19 @@ func (r *teamRepository) ListByOrganization(tx *sql.Tx, organizationId int) ([]*
 	)
 }
 
-func (r *teamRepository) Create(tx *sql.Tx, team *models.Team) (int, error) {
+func (r *teamRepository) Create(tx lit.Executor, team *models.Team) (int, error) {
 	return lit.Insert[models.Team](tx, team)
 }
 
-func (r *teamRepository) Update(tx *sql.Tx, team *models.Team) error {
+func (r *teamRepository) Update(tx lit.Executor, team *models.Team) error {
 	return lit.UpdateNamed(tx, team, "id = :id", lit.P{"id": team.Id})
 }
 
-func (r *teamRepository) Delete(tx *sql.Tx, id int) error {
+func (r *teamRepository) Delete(tx lit.Executor, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM teams WHERE id = :id", lit.P{"id": id})
 }
 
-func (r *teamRepository) SetMembers(tx *sql.Tx, teamId int, orderedUserIds []int) error {
+func (r *teamRepository) SetMembers(tx lit.Executor, teamId int, orderedUserIds []int) error {
 	if err := lit.DeleteNamed(db.Driver, tx, "DELETE FROM team_members WHERE team_id = :team_id", lit.P{"team_id": teamId}); err != nil {
 		return err
 	}
@@ -78,7 +77,7 @@ func (r *teamRepository) SetMembers(tx *sql.Tx, teamId int, orderedUserIds []int
 	return nil
 }
 
-func (r *teamRepository) ListMembersWithUsersByOrganization(tx *sql.Tx, organizationId int) ([]*models.TeamMemberWithUser, error) {
+func (r *teamRepository) ListMembersWithUsersByOrganization(tx lit.Executor, organizationId int) ([]*models.TeamMemberWithUser, error) {
 	return lit.SelectNamed[models.TeamMemberWithUser](
 		tx,
 		`SELECT tm.team_id, tm.user_id, tm.position, u.name, u.email
@@ -91,7 +90,7 @@ func (r *teamRepository) ListMembersWithUsersByOrganization(tx *sql.Tx, organiza
 	)
 }
 
-func (r *teamRepository) FindMemberUserIds(tx *sql.Tx, teamId int) ([]int, error) {
+func (r *teamRepository) FindMemberUserIds(tx lit.Executor, teamId int) ([]int, error) {
 	members, err := lit.SelectNamed[models.TeamMember](
 		tx,
 		"SELECT id, team_id, user_id, position, created_at FROM team_members WHERE team_id = :team_id ORDER BY position ASC, id ASC",
@@ -107,7 +106,7 @@ func (r *teamRepository) FindMemberUserIds(tx *sql.Tx, teamId int) ([]int, error
 	return userIds, nil
 }
 
-func (r *teamRepository) RemoveUserFromOrgTeams(tx *sql.Tx, organizationId int, userId int) error {
+func (r *teamRepository) RemoveUserFromOrgTeams(tx lit.Executor, organizationId int, userId int) error {
 	return lit.DeleteNamed(
 		db.Driver,
 		tx,
@@ -118,7 +117,7 @@ func (r *teamRepository) RemoveUserFromOrgTeams(tx *sql.Tx, organizationId int, 
 	)
 }
 
-func (r *teamRepository) SetProjects(tx *sql.Tx, teamId int, projectIds []uuid.UUID) error {
+func (r *teamRepository) SetProjects(tx lit.Executor, teamId int, projectIds []uuid.UUID) error {
 	if err := lit.DeleteNamed(db.Driver, tx, "DELETE FROM project_teams WHERE team_id = :team_id", lit.P{"team_id": teamId}); err != nil {
 		return err
 	}
@@ -136,7 +135,7 @@ func (r *teamRepository) SetProjects(tx *sql.Tx, teamId int, projectIds []uuid.U
 	return nil
 }
 
-func (r *teamRepository) ListProjectsByOrganization(tx *sql.Tx, organizationId int) ([]*models.TeamProjectRow, error) {
+func (r *teamRepository) ListProjectsByOrganization(tx lit.Executor, organizationId int) ([]*models.TeamProjectRow, error) {
 	return lit.SelectNamed[models.TeamProjectRow](
 		tx,
 		`SELECT pt.team_id, pt.project_id, p.name
@@ -149,7 +148,7 @@ func (r *teamRepository) ListProjectsByOrganization(tx *sql.Tx, organizationId i
 	)
 }
 
-func (r *teamRepository) FindProjectTeam(tx *sql.Tx, projectId uuid.UUID) (*models.ProjectTeam, error) {
+func (r *teamRepository) FindProjectTeam(tx lit.Executor, projectId uuid.UUID) (*models.ProjectTeam, error) {
 	return lit.SelectSingleNamed[models.ProjectTeam](
 		tx,
 		"SELECT id, project_id, team_id, created_at FROM project_teams WHERE project_id = :project_id",
@@ -157,7 +156,7 @@ func (r *teamRepository) FindProjectTeam(tx *sql.Tx, projectId uuid.UUID) (*mode
 	)
 }
 
-func (r *teamRepository) FindTeamForProject(tx *sql.Tx, projectId uuid.UUID) (*models.Team, error) {
+func (r *teamRepository) FindTeamForProject(tx lit.Executor, projectId uuid.UUID) (*models.Team, error) {
 	return lit.SelectSingleNamed[models.Team](
 		tx,
 		`SELECT t.id, t.organization_id, t.name, t.description, t.created_at, t.updated_at

@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -15,7 +14,7 @@ type escalationPolicyRepository struct{}
 
 const escalationPolicyColumns = "id, organization_id, name, definition, created_by, created_at, updated_at"
 
-func (r *escalationPolicyRepository) FindById(tx *sql.Tx, id int) (*models.EscalationPolicy, error) {
+func (r *escalationPolicyRepository) FindById(tx lit.Executor, id int) (*models.EscalationPolicy, error) {
 	return lit.SelectSingleNamed[models.EscalationPolicy](
 		tx,
 		"SELECT "+escalationPolicyColumns+" FROM escalation_policies WHERE id = :id",
@@ -23,7 +22,7 @@ func (r *escalationPolicyRepository) FindById(tx *sql.Tx, id int) (*models.Escal
 	)
 }
 
-func (r *escalationPolicyRepository) FindByOrganization(tx *sql.Tx, organizationId int) ([]*models.EscalationPolicy, error) {
+func (r *escalationPolicyRepository) FindByOrganization(tx lit.Executor, organizationId int) ([]*models.EscalationPolicy, error) {
 	return lit.SelectNamed[models.EscalationPolicy](
 		tx,
 		"SELECT "+escalationPolicyColumns+" FROM escalation_policies WHERE organization_id = :organization_id ORDER BY name ASC, id ASC",
@@ -31,7 +30,7 @@ func (r *escalationPolicyRepository) FindByOrganization(tx *sql.Tx, organization
 	)
 }
 
-func (r *escalationPolicyRepository) FindByOrganizationAndName(tx *sql.Tx, organizationId int, name string) (*models.EscalationPolicy, error) {
+func (r *escalationPolicyRepository) FindByOrganizationAndName(tx lit.Executor, organizationId int, name string) (*models.EscalationPolicy, error) {
 	return lit.SelectSingleNamed[models.EscalationPolicy](
 		tx,
 		"SELECT "+escalationPolicyColumns+" FROM escalation_policies WHERE organization_id = :organization_id AND LOWER(name) = LOWER(:name)",
@@ -39,15 +38,15 @@ func (r *escalationPolicyRepository) FindByOrganizationAndName(tx *sql.Tx, organ
 	)
 }
 
-func (r *escalationPolicyRepository) Create(tx *sql.Tx, policy *models.EscalationPolicy) (int, error) {
+func (r *escalationPolicyRepository) Create(tx lit.Executor, policy *models.EscalationPolicy) (int, error) {
 	return lit.Insert[models.EscalationPolicy](tx, policy)
 }
 
-func (r *escalationPolicyRepository) Update(tx *sql.Tx, policy *models.EscalationPolicy) error {
+func (r *escalationPolicyRepository) Update(tx lit.Executor, policy *models.EscalationPolicy) error {
 	return lit.UpdateNamed(tx, policy, "id = :id", lit.P{"id": policy.Id})
 }
 
-func (r *escalationPolicyRepository) Delete(tx *sql.Tx, id int) error {
+func (r *escalationPolicyRepository) Delete(tx lit.Executor, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM escalation_policies WHERE id = :id", lit.P{"id": id})
 }
 

@@ -3,7 +3,6 @@
 package sqlite
 
 import (
-	"database/sql"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -14,7 +13,7 @@ import (
 
 type notificationChannelRepository struct{}
 
-func (r *notificationChannelRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.NotificationChannel, error) {
+func (r *notificationChannelRepository) FindByProject(tx lit.Executor, projectId uuid.UUID) ([]*models.NotificationChannel, error) {
 	return lit.SelectNamed[models.NotificationChannel](
 		tx,
 		"SELECT id, project_id, name, channel_type, config, enabled, created_by, created_at, updated_at FROM notification_channels WHERE project_id = :project_id ORDER BY created_at DESC",
@@ -25,7 +24,7 @@ func (r *notificationChannelRepository) FindByProject(tx *sql.Tx, projectId uuid
 // FindEscalationByOrganization returns every escalation channel across the
 // organization's projects in one query; callers match policy ids from the
 // config JSON in Go.
-func (r *notificationChannelRepository) FindEscalationByOrganization(tx *sql.Tx, organizationId int) ([]*models.NotificationChannel, error) {
+func (r *notificationChannelRepository) FindEscalationByOrganization(tx lit.Executor, organizationId int) ([]*models.NotificationChannel, error) {
 	return lit.SelectNamed[models.NotificationChannel](
 		tx,
 		"SELECT nc.id, nc.project_id, nc.name, nc.channel_type, nc.config, nc.enabled, nc.created_by, nc.created_at, nc.updated_at FROM notification_channels nc JOIN projects p ON p.id = nc.project_id WHERE p.organization_id = :organization_id AND nc.channel_type = 'escalation' ORDER BY nc.name ASC, nc.id ASC",
@@ -33,7 +32,7 @@ func (r *notificationChannelRepository) FindEscalationByOrganization(tx *sql.Tx,
 	)
 }
 
-func (r *notificationChannelRepository) FindById(tx *sql.Tx, id int) (*models.NotificationChannel, error) {
+func (r *notificationChannelRepository) FindById(tx lit.Executor, id int) (*models.NotificationChannel, error) {
 	return lit.SelectSingleNamed[models.NotificationChannel](
 		tx,
 		"SELECT id, project_id, name, channel_type, config, enabled, created_by, created_at, updated_at FROM notification_channels WHERE id = :id",
@@ -41,19 +40,19 @@ func (r *notificationChannelRepository) FindById(tx *sql.Tx, id int) (*models.No
 	)
 }
 
-func (r *notificationChannelRepository) Create(tx *sql.Tx, channel *models.NotificationChannel) (int, error) {
+func (r *notificationChannelRepository) Create(tx lit.Executor, channel *models.NotificationChannel) (int, error) {
 	return lit.Insert[models.NotificationChannel](tx, channel)
 }
 
-func (r *notificationChannelRepository) Update(tx *sql.Tx, channel *models.NotificationChannel) error {
+func (r *notificationChannelRepository) Update(tx lit.Executor, channel *models.NotificationChannel) error {
 	return lit.UpdateNamed(tx, channel, "id = :id", lit.P{"id": channel.Id})
 }
 
-func (r *notificationChannelRepository) Delete(tx *sql.Tx, id int) error {
+func (r *notificationChannelRepository) Delete(tx lit.Executor, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM notification_channels WHERE id = :id", lit.P{"id": id})
 }
 
-func (r *notificationChannelRepository) FindEnabledByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.NotificationChannel, error) {
+func (r *notificationChannelRepository) FindEnabledByProject(tx lit.Executor, projectId uuid.UUID) ([]*models.NotificationChannel, error) {
 	return lit.SelectNamed[models.NotificationChannel](
 		tx,
 		"SELECT id, project_id, name, channel_type, config, enabled, created_by, created_at, updated_at FROM notification_channels WHERE project_id = :project_id AND enabled = true",

@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -41,19 +40,19 @@ func postMortemFilter(projectId uuid.UUID, search string, tags []string) (string
 	return conditions, params
 }
 
-func (r *postMortemRepository) Create(tx *sql.Tx, postMortem *models.PostMortem) (int, error) {
+func (r *postMortemRepository) Create(tx lit.Executor, postMortem *models.PostMortem) (int, error) {
 	return lit.Insert[models.PostMortem](tx, postMortem)
 }
 
-func (r *postMortemRepository) Update(tx *sql.Tx, postMortem *models.PostMortem) error {
+func (r *postMortemRepository) Update(tx lit.Executor, postMortem *models.PostMortem) error {
 	return lit.UpdateNamed(tx, postMortem, "id = :id AND project_id = :project_id", lit.P{"id": postMortem.Id, "project_id": postMortem.ProjectId})
 }
 
-func (r *postMortemRepository) Delete(tx *sql.Tx, id int, projectId uuid.UUID) error {
+func (r *postMortemRepository) Delete(tx lit.Executor, id int, projectId uuid.UUID) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM post_mortems WHERE id = :id AND project_id = :project_id", lit.P{"id": id, "project_id": projectId})
 }
 
-func (r *postMortemRepository) FindByIdForProject(tx *sql.Tx, id int, projectId uuid.UUID) (*models.PostMortem, error) {
+func (r *postMortemRepository) FindByIdForProject(tx lit.Executor, id int, projectId uuid.UUID) (*models.PostMortem, error) {
 	return lit.SelectSingleNamed[models.PostMortem](
 		tx,
 		"SELECT "+postMortemColumns+" FROM post_mortems WHERE id = :id AND project_id = :project_id",
@@ -61,7 +60,7 @@ func (r *postMortemRepository) FindByIdForProject(tx *sql.Tx, id int, projectId 
 	)
 }
 
-func (r *postMortemRepository) FindDetailByIdForProject(tx *sql.Tx, id int, projectId uuid.UUID) (*models.PostMortemDetail, error) {
+func (r *postMortemRepository) FindDetailByIdForProject(tx lit.Executor, id int, projectId uuid.UUID) (*models.PostMortemDetail, error) {
 	return lit.SelectSingleNamed[models.PostMortemDetail](
 		tx,
 		"SELECT "+postMortemDetailColumns+" FROM post_mortems pm"+postMortemUserJoins+" WHERE pm.id = :id AND pm.project_id = :project_id",
@@ -69,7 +68,7 @@ func (r *postMortemRepository) FindDetailByIdForProject(tx *sql.Tx, id int, proj
 	)
 }
 
-func (r *postMortemRepository) FindRefsByIncidentIds(tx *sql.Tx, incidentIds []int) ([]*models.PostMortemRef, error) {
+func (r *postMortemRepository) FindRefsByIncidentIds(tx lit.Executor, incidentIds []int) ([]*models.PostMortemRef, error) {
 	if len(incidentIds) == 0 {
 		return []*models.PostMortemRef{}, nil
 	}
@@ -81,7 +80,7 @@ func (r *postMortemRepository) FindRefsByIncidentIds(tx *sql.Tx, incidentIds []i
 	)
 }
 
-func (r *postMortemRepository) ListByProject(tx *sql.Tx, projectId uuid.UUID, search string, tags []string, limit int, offset int) ([]*models.PostMortemListItem, error) {
+func (r *postMortemRepository) ListByProject(tx lit.Executor, projectId uuid.UUID, search string, tags []string, limit int, offset int) ([]*models.PostMortemListItem, error) {
 	conditions, params := postMortemFilter(projectId, search, tags)
 	params["limit"] = limit
 	params["offset"] = offset
@@ -92,7 +91,7 @@ func (r *postMortemRepository) ListByProject(tx *sql.Tx, projectId uuid.UUID, se
 	)
 }
 
-func (r *postMortemRepository) CountByProject(tx *sql.Tx, projectId uuid.UUID, search string, tags []string) (int, error) {
+func (r *postMortemRepository) CountByProject(tx lit.Executor, projectId uuid.UUID, search string, tags []string) (int, error) {
 	conditions, params := postMortemFilter(projectId, search, tags)
 	result, err := lit.SelectSingleNamed[models.CountResult](
 		tx,
@@ -108,12 +107,12 @@ func (r *postMortemRepository) CountByProject(tx *sql.Tx, projectId uuid.UUID, s
 	return result.Count, nil
 }
 
-func (r *postMortemRepository) RecordEvent(tx *sql.Tx, event *models.PostMortemEvent) error {
+func (r *postMortemRepository) RecordEvent(tx lit.Executor, event *models.PostMortemEvent) error {
 	_, err := lit.Insert[models.PostMortemEvent](tx, event)
 	return err
 }
 
-func (r *postMortemRepository) ListEvents(tx *sql.Tx, postMortemId int, projectId uuid.UUID, limit int) ([]*models.PostMortemEventItem, error) {
+func (r *postMortemRepository) ListEvents(tx lit.Executor, postMortemId int, projectId uuid.UUID, limit int) ([]*models.PostMortemEventItem, error) {
 	return lit.SelectNamed[models.PostMortemEventItem](
 		tx,
 		"SELECT e.id, e.post_mortem_id, e.user_id, e.action, e.changes, e.created_at, u.name AS user_name"+

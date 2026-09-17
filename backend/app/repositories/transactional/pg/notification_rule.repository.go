@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -15,7 +14,7 @@ import (
 
 type notificationRuleRepository struct{}
 
-func (r *notificationRuleRepository) FindByProjectWithChannel(tx *sql.Tx, projectId uuid.UUID) ([]*models.NotificationRuleWithChannel, error) {
+func (r *notificationRuleRepository) FindByProjectWithChannel(tx lit.Executor, projectId uuid.UUID) ([]*models.NotificationRuleWithChannel, error) {
 	return lit.SelectNamed[models.NotificationRuleWithChannel](
 		tx,
 		`SELECT r.id, r.project_id, r.channel_id, r.name, r.rule_type, r.config, r.enabled, r.cooldown_minutes, r.severity, r.snoozed_until, r.created_by, r.created_at, r.updated_at,
@@ -28,7 +27,7 @@ func (r *notificationRuleRepository) FindByProjectWithChannel(tx *sql.Tx, projec
 	)
 }
 
-func (r *notificationRuleRepository) FindById(tx *sql.Tx, id int) (*models.NotificationRule, error) {
+func (r *notificationRuleRepository) FindById(tx lit.Executor, id int) (*models.NotificationRule, error) {
 	return lit.SelectSingleNamed[models.NotificationRule](
 		tx,
 		"SELECT id, project_id, channel_id, name, rule_type, config, enabled, cooldown_minutes, severity, snoozed_until, created_by, created_at, updated_at FROM notification_rules WHERE id = :id",
@@ -36,7 +35,7 @@ func (r *notificationRuleRepository) FindById(tx *sql.Tx, id int) (*models.Notif
 	)
 }
 
-func (r *notificationRuleRepository) FindEnabledPolledRules(tx *sql.Tx) ([]*models.NotificationRuleWithChannel, error) {
+func (r *notificationRuleRepository) FindEnabledPolledRules(tx lit.Executor) ([]*models.NotificationRuleWithChannel, error) {
 	return lit.Select[models.NotificationRuleWithChannel](
 		tx,
 		`SELECT r.id, r.project_id, r.channel_id, r.name, r.rule_type, r.config, r.enabled, r.cooldown_minutes, r.severity, r.snoozed_until, r.created_by, r.created_at, r.updated_at,
@@ -48,7 +47,7 @@ func (r *notificationRuleRepository) FindEnabledPolledRules(tx *sql.Tx) ([]*mode
 	)
 }
 
-func (r *notificationRuleRepository) FindEnabledEventRules(tx *sql.Tx, projectId uuid.UUID) ([]*models.NotificationRuleWithChannel, error) {
+func (r *notificationRuleRepository) FindEnabledEventRules(tx lit.Executor, projectId uuid.UUID) ([]*models.NotificationRuleWithChannel, error) {
 	return lit.SelectNamed[models.NotificationRuleWithChannel](
 		tx,
 		`SELECT r.id, r.project_id, r.channel_id, r.name, r.rule_type, r.config, r.enabled, r.cooldown_minutes, r.severity, r.snoozed_until, r.created_by, r.created_at, r.updated_at,
@@ -61,19 +60,19 @@ func (r *notificationRuleRepository) FindEnabledEventRules(tx *sql.Tx, projectId
 	)
 }
 
-func (r *notificationRuleRepository) Create(tx *sql.Tx, rule *models.NotificationRule) (int, error) {
+func (r *notificationRuleRepository) Create(tx lit.Executor, rule *models.NotificationRule) (int, error) {
 	return lit.Insert[models.NotificationRule](tx, rule)
 }
 
-func (r *notificationRuleRepository) Update(tx *sql.Tx, rule *models.NotificationRule) error {
+func (r *notificationRuleRepository) Update(tx lit.Executor, rule *models.NotificationRule) error {
 	return lit.UpdateNamed(tx, rule, "id = :id", lit.P{"id": rule.Id})
 }
 
-func (r *notificationRuleRepository) Delete(tx *sql.Tx, id int) error {
+func (r *notificationRuleRepository) Delete(tx lit.Executor, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM notification_rules WHERE id = :id", lit.P{"id": id})
 }
 
-func (r *notificationRuleRepository) UpdateEnabled(tx *sql.Tx, id int, enabled bool) error {
+func (r *notificationRuleRepository) UpdateEnabled(tx lit.Executor, id int, enabled bool) error {
 	q, a, err := lit.ParseNamedQuery(db.Driver, "UPDATE notification_rules SET enabled = :enabled, updated_at = :updated_at WHERE id = :id", lit.P{"enabled": enabled, "updated_at": time.Now().UTC(), "id": id})
 	if err != nil {
 		return err
@@ -81,7 +80,7 @@ func (r *notificationRuleRepository) UpdateEnabled(tx *sql.Tx, id int, enabled b
 	return lit.UpdateNative(tx, q, a...)
 }
 
-func (r *notificationRuleRepository) UpdateSnoozedUntil(tx *sql.Tx, id int, snoozedUntil *time.Time) error {
+func (r *notificationRuleRepository) UpdateSnoozedUntil(tx lit.Executor, id int, snoozedUntil *time.Time) error {
 	q, a, err := lit.ParseNamedQuery(db.Driver, "UPDATE notification_rules SET snoozed_until = :snoozed_until, updated_at = :updated_at WHERE id = :id", lit.P{"snoozed_until": snoozedUntil, "updated_at": time.Now().UTC(), "id": id})
 	if err != nil {
 		return err

@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -16,7 +15,7 @@ type oncallOverrideRepository struct{}
 
 const oncallOverrideColumns = "id, schedule_id, user_id, start_at, end_at, created_by, created_at"
 
-func (r *oncallOverrideRepository) FindById(tx *sql.Tx, id int) (*models.OncallOverride, error) {
+func (r *oncallOverrideRepository) FindById(tx lit.Executor, id int) (*models.OncallOverride, error) {
 	return lit.SelectSingleNamed[models.OncallOverride](
 		tx,
 		"SELECT "+oncallOverrideColumns+" FROM oncall_overrides WHERE id = :id",
@@ -24,7 +23,7 @@ func (r *oncallOverrideRepository) FindById(tx *sql.Tx, id int) (*models.OncallO
 	)
 }
 
-func (r *oncallOverrideRepository) ListForRange(tx *sql.Tx, scheduleId int, from time.Time, to time.Time) ([]*models.OncallOverride, error) {
+func (r *oncallOverrideRepository) ListForRange(tx lit.Executor, scheduleId int, from time.Time, to time.Time) ([]*models.OncallOverride, error) {
 	return lit.SelectNamed[models.OncallOverride](
 		tx,
 		`SELECT `+oncallOverrideColumns+` FROM oncall_overrides
@@ -37,7 +36,7 @@ func (r *oncallOverrideRepository) ListForRange(tx *sql.Tx, scheduleId int, from
 // ListForRangeByOrganization returns every override intersecting [from, to)
 // across the organization's schedules in one query; callers group by
 // ScheduleId.
-func (r *oncallOverrideRepository) ListForRangeByOrganization(tx *sql.Tx, organizationId int, from time.Time, to time.Time) ([]*models.OncallOverride, error) {
+func (r *oncallOverrideRepository) ListForRangeByOrganization(tx lit.Executor, organizationId int, from time.Time, to time.Time) ([]*models.OncallOverride, error) {
 	return lit.SelectNamed[models.OncallOverride](
 		tx,
 		`SELECT `+oncallOverrideColumns+` FROM oncall_overrides
@@ -47,17 +46,17 @@ func (r *oncallOverrideRepository) ListForRangeByOrganization(tx *sql.Tx, organi
 	)
 }
 
-func (r *oncallOverrideRepository) Create(tx *sql.Tx, override *models.OncallOverride) (int, error) {
+func (r *oncallOverrideRepository) Create(tx lit.Executor, override *models.OncallOverride) (int, error) {
 	return lit.Insert[models.OncallOverride](tx, override)
 }
 
-func (r *oncallOverrideRepository) Delete(tx *sql.Tx, id int) error {
+func (r *oncallOverrideRepository) Delete(tx lit.Executor, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM oncall_overrides WHERE id = :id", lit.P{"id": id})
 }
 
 // DeleteByOrganizationAndUser removes a user's overrides across every schedule
 // in the organization; called when the user is removed from the organization.
-func (r *oncallOverrideRepository) DeleteByOrganizationAndUser(tx *sql.Tx, organizationId int, userId int) error {
+func (r *oncallOverrideRepository) DeleteByOrganizationAndUser(tx lit.Executor, organizationId int, userId int) error {
 	return lit.DeleteNamed(
 		db.Driver,
 		tx,

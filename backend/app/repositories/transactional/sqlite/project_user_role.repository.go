@@ -3,7 +3,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -15,7 +14,7 @@ import (
 
 type projectUserRoleRepository struct{}
 
-func (r *projectUserRoleRepository) FindByOrganizationAndUser(tx *sql.Tx, organizationId int, userId int) ([]*models.MemberProjectRole, error) {
+func (r *projectUserRoleRepository) FindByOrganizationAndUser(tx lit.Executor, organizationId int, userId int) ([]*models.MemberProjectRole, error) {
 	return lit.SelectNamed[models.MemberProjectRole](
 		tx,
 		`SELECT p.id as project_id, p.name, p.framework, pur.role
@@ -27,7 +26,7 @@ func (r *projectUserRoleRepository) FindByOrganizationAndUser(tx *sql.Tx, organi
 	)
 }
 
-func (r *projectUserRoleRepository) Upsert(tx *sql.Tx, projectId uuid.UUID, userId int, role string) error {
+func (r *projectUserRoleRepository) Upsert(tx lit.Executor, projectId uuid.UUID, userId int, role string) error {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		`INSERT INTO project_user_roles (project_id, user_id, role, created_at)
@@ -46,7 +45,7 @@ func (r *projectUserRoleRepository) Upsert(tx *sql.Tx, projectId uuid.UUID, user
 	return lit.UpdateNative(tx, query, args...)
 }
 
-func (r *projectUserRoleRepository) Delete(tx *sql.Tx, projectId uuid.UUID, userId int) error {
+func (r *projectUserRoleRepository) Delete(tx lit.Executor, projectId uuid.UUID, userId int) error {
 	return lit.DeleteNamed(
 		db.Driver,
 		tx,
@@ -55,7 +54,7 @@ func (r *projectUserRoleRepository) Delete(tx *sql.Tx, projectId uuid.UUID, user
 	)
 }
 
-func (r *projectUserRoleRepository) DeleteByOrganizationAndUser(tx *sql.Tx, organizationId int, userId int) error {
+func (r *projectUserRoleRepository) DeleteByOrganizationAndUser(tx lit.Executor, organizationId int, userId int) error {
 	return lit.DeleteNamed(
 		db.Driver,
 		tx,

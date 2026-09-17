@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 
 	"github.com/tracewayapp/traceway/backend/app/models"
 
@@ -14,7 +13,7 @@ type dashboardTemplateRepository struct{}
 
 const dashboardTemplateColumns = "id, key, name, description, category, definition, created_at, updated_at"
 
-func (r *dashboardTemplateRepository) FindAll(tx *sql.Tx) ([]*models.DashboardTemplate, error) {
+func (r *dashboardTemplateRepository) FindAll(tx lit.Executor) ([]*models.DashboardTemplate, error) {
 	return lit.SelectNamed[models.DashboardTemplate](
 		tx,
 		"SELECT "+dashboardTemplateColumns+" FROM dashboard_templates ORDER BY category ASC, name ASC",
@@ -22,7 +21,7 @@ func (r *dashboardTemplateRepository) FindAll(tx *sql.Tx) ([]*models.DashboardTe
 	)
 }
 
-func (r *dashboardTemplateRepository) FindByKey(tx *sql.Tx, key string) (*models.DashboardTemplate, error) {
+func (r *dashboardTemplateRepository) FindByKey(tx lit.Executor, key string) (*models.DashboardTemplate, error) {
 	return lit.SelectSingleNamed[models.DashboardTemplate](
 		tx,
 		"SELECT "+dashboardTemplateColumns+" FROM dashboard_templates WHERE key = :key",
@@ -30,7 +29,7 @@ func (r *dashboardTemplateRepository) FindByKey(tx *sql.Tx, key string) (*models
 	)
 }
 
-func (r *dashboardTemplateRepository) Create(tx *sql.Tx, template *models.DashboardTemplate) (int, error) {
+func (r *dashboardTemplateRepository) Create(tx lit.Executor, template *models.DashboardTemplate) (int, error) {
 	return lit.Insert[models.DashboardTemplate](tx, template)
 }
 

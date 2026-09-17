@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -15,7 +14,7 @@ type oncallScheduleRepository struct{}
 
 const oncallScheduleColumns = "id, organization_id, team_id, name, description, timezone, definition, created_by, created_at, updated_at"
 
-func (r *oncallScheduleRepository) FindById(tx *sql.Tx, id int) (*models.OncallSchedule, error) {
+func (r *oncallScheduleRepository) FindById(tx lit.Executor, id int) (*models.OncallSchedule, error) {
 	return lit.SelectSingleNamed[models.OncallSchedule](
 		tx,
 		"SELECT "+oncallScheduleColumns+" FROM oncall_schedules WHERE id = :id",
@@ -23,7 +22,7 @@ func (r *oncallScheduleRepository) FindById(tx *sql.Tx, id int) (*models.OncallS
 	)
 }
 
-func (r *oncallScheduleRepository) FindByOrganizationAndName(tx *sql.Tx, organizationId int, name string) (*models.OncallSchedule, error) {
+func (r *oncallScheduleRepository) FindByOrganizationAndName(tx lit.Executor, organizationId int, name string) (*models.OncallSchedule, error) {
 	return lit.SelectSingleNamed[models.OncallSchedule](
 		tx,
 		"SELECT "+oncallScheduleColumns+" FROM oncall_schedules WHERE organization_id = :organization_id AND LOWER(name) = LOWER(:name)",
@@ -31,7 +30,7 @@ func (r *oncallScheduleRepository) FindByOrganizationAndName(tx *sql.Tx, organiz
 	)
 }
 
-func (r *oncallScheduleRepository) ListByOrganization(tx *sql.Tx, organizationId int) ([]*models.OncallSchedule, error) {
+func (r *oncallScheduleRepository) ListByOrganization(tx lit.Executor, organizationId int) ([]*models.OncallSchedule, error) {
 	return lit.SelectNamed[models.OncallSchedule](
 		tx,
 		"SELECT "+oncallScheduleColumns+" FROM oncall_schedules WHERE organization_id = :organization_id ORDER BY name ASC, id ASC",
@@ -39,7 +38,7 @@ func (r *oncallScheduleRepository) ListByOrganization(tx *sql.Tx, organizationId
 	)
 }
 
-func (r *oncallScheduleRepository) ListByTeam(tx *sql.Tx, teamId int) ([]*models.OncallSchedule, error) {
+func (r *oncallScheduleRepository) ListByTeam(tx lit.Executor, teamId int) ([]*models.OncallSchedule, error) {
 	return lit.SelectNamed[models.OncallSchedule](
 		tx,
 		"SELECT "+oncallScheduleColumns+" FROM oncall_schedules WHERE team_id = :team_id ORDER BY created_at ASC, id ASC",
@@ -47,15 +46,15 @@ func (r *oncallScheduleRepository) ListByTeam(tx *sql.Tx, teamId int) ([]*models
 	)
 }
 
-func (r *oncallScheduleRepository) Create(tx *sql.Tx, schedule *models.OncallSchedule) (int, error) {
+func (r *oncallScheduleRepository) Create(tx lit.Executor, schedule *models.OncallSchedule) (int, error) {
 	return lit.Insert[models.OncallSchedule](tx, schedule)
 }
 
-func (r *oncallScheduleRepository) Update(tx *sql.Tx, schedule *models.OncallSchedule) error {
+func (r *oncallScheduleRepository) Update(tx lit.Executor, schedule *models.OncallSchedule) error {
 	return lit.UpdateNamed(tx, schedule, "id = :id", lit.P{"id": schedule.Id})
 }
 
-func (r *oncallScheduleRepository) Delete(tx *sql.Tx, id int) error {
+func (r *oncallScheduleRepository) Delete(tx lit.Executor, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM oncall_schedules WHERE id = :id", lit.P{"id": id})
 }
 

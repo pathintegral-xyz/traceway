@@ -3,7 +3,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -19,7 +18,7 @@ const syntheticRunnerColumns = "id, name, version, first_seen_at, last_seen_at"
 // UpsertSeen self-registers a runner by name on first contact and refreshes
 // its liveness/version afterwards, returning the current row. A lost race on
 // the unique name (two first polls at once) falls back to the winner's row.
-func (r *syntheticRunnerRepository) UpsertSeen(tx *sql.Tx, name string, version string, now time.Time) (*models.SyntheticRunner, error) {
+func (r *syntheticRunnerRepository) UpsertSeen(tx lit.Executor, name string, version string, now time.Time) (*models.SyntheticRunner, error) {
 	existing, err := r.findByName(tx, name)
 	if err != nil {
 		return nil, err
@@ -63,7 +62,7 @@ func (r *syntheticRunnerRepository) UpsertSeen(tx *sql.Tx, name string, version 
 	return existing, nil
 }
 
-func (r *syntheticRunnerRepository) findByName(tx *sql.Tx, name string) (*models.SyntheticRunner, error) {
+func (r *syntheticRunnerRepository) findByName(tx lit.Executor, name string) (*models.SyntheticRunner, error) {
 	return lit.SelectSingleNamed[models.SyntheticRunner](
 		tx,
 		"SELECT "+syntheticRunnerColumns+" FROM synthetic_runners WHERE name = :name",
@@ -71,7 +70,7 @@ func (r *syntheticRunnerRepository) findByName(tx *sql.Tx, name string) (*models
 	)
 }
 
-func (r *syntheticRunnerRepository) CountOnline(tx *sql.Tx, since time.Time) (int, error) {
+func (r *syntheticRunnerRepository) CountOnline(tx lit.Executor, since time.Time) (int, error) {
 	result, err := lit.SelectSingleNamed[models.CountResult](
 		tx,
 		"SELECT COUNT(*) as count FROM synthetic_runners WHERE last_seen_at >= :since",

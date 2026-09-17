@@ -13,7 +13,7 @@ import (
 
 type oauthSessionRepository struct{}
 
-func (r *oauthSessionRepository) Get(tx *sql.Tx, id string) ([]byte, error) {
+func (r *oauthSessionRepository) Get(tx lit.Executor, id string) ([]byte, error) {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		"SELECT data FROM oauth_sessions WHERE id = :id AND expires_at > :now",
@@ -33,7 +33,7 @@ func (r *oauthSessionRepository) Get(tx *sql.Tx, id string) ([]byte, error) {
 	return data, nil
 }
 
-func (r *oauthSessionRepository) Save(tx *sql.Tx, id string, data []byte, expiresAt time.Time) error {
+func (r *oauthSessionRepository) Save(tx lit.Executor, id string, data []byte, expiresAt time.Time) error {
 	deleteQuery, deleteArgs, err := lit.ParseNamedQuery(
 		db.Driver,
 		"DELETE FROM oauth_sessions WHERE id = :id",
@@ -62,7 +62,7 @@ func (r *oauthSessionRepository) Save(tx *sql.Tx, id string, data []byte, expire
 	return err
 }
 
-func (r *oauthSessionRepository) Delete(tx *sql.Tx, id string) error {
+func (r *oauthSessionRepository) Delete(tx lit.Executor, id string) error {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		"DELETE FROM oauth_sessions WHERE id = :id",
@@ -75,7 +75,7 @@ func (r *oauthSessionRepository) Delete(tx *sql.Tx, id string) error {
 	return err
 }
 
-func (r *oauthSessionRepository) PruneExpired(tx *sql.Tx, now time.Time) (int64, error) {
+func (r *oauthSessionRepository) PruneExpired(tx lit.Executor, now time.Time) (int64, error) {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		"DELETE FROM oauth_sessions WHERE expires_at < :cutoff",

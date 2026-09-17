@@ -3,7 +3,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -130,7 +129,7 @@ func (p *projectRepository) FindAll(executor lit.Executor) ([]*models.Project, e
 	)
 }
 
-func (p *projectRepository) FindByToken(tx *sql.Tx, token string) (*models.Project, error) {
+func (p *projectRepository) FindByToken(tx lit.Executor, token string) (*models.Project, error) {
 	return lit.SelectSingleNamed[models.Project](
 		tx,
 		"SELECT id, name, token, framework, organization_id, created_at, source_map_token, drop_healthy_healthchecks, healthcheck_paths, profile_label_allowlist, ai_flagged_terms, ai_flagged_languages FROM projects WHERE token = :token",
@@ -146,7 +145,7 @@ func (p *projectRepository) FindById(tx lit.Executor, id uuid.UUID) (*models.Pro
 	)
 }
 
-func (p *projectRepository) Create(tx *sql.Tx, name string, framework string) (*models.Project, error) {
+func (p *projectRepository) Create(tx lit.Executor, name string, framework string) (*models.Project, error) {
 	project := &models.Project{
 		Id:                      uuid.New(),
 		Name:                    name,
@@ -168,7 +167,7 @@ func (p *projectRepository) Create(tx *sql.Tx, name string, framework string) (*
 	return project, nil
 }
 
-func (p *projectRepository) CreateWithOrganization(tx *sql.Tx, name string, framework string, organizationId int) (*models.Project, error) {
+func (p *projectRepository) CreateWithOrganization(tx lit.Executor, name string, framework string, organizationId int) (*models.Project, error) {
 	project := &models.Project{
 		Id:                      uuid.New(),
 		Name:                    name,
@@ -206,7 +205,7 @@ func (p *projectRepository) FindByOrganizationId(tx lit.Executor, organizationId
 	)
 }
 
-func (p *projectRepository) FindByUserId(tx *sql.Tx, userId int) ([]*models.Project, error) {
+func (p *projectRepository) FindByUserId(tx lit.Executor, userId int) ([]*models.Project, error) {
 	return lit.SelectNamed[models.Project](
 		tx,
 		`SELECT DISTINCT p.id, p.name, p.token, p.framework, p.organization_id, p.created_at, p.source_map_token, p.drop_healthy_healthchecks, p.healthcheck_paths, p.profile_label_allowlist, p.ai_flagged_terms, p.ai_flagged_languages
@@ -237,7 +236,7 @@ func (p *projectRepository) UserHasAccess(tx lit.Executor, projectId uuid.UUID, 
 	return result.Count > 0, nil
 }
 
-func (p *projectRepository) GenerateSourceMapToken(tx *sql.Tx, projectId uuid.UUID) (string, error) {
+func (p *projectRepository) GenerateSourceMapToken(tx lit.Executor, projectId uuid.UUID) (string, error) {
 	project, err := p.FindById(tx, projectId)
 	if err != nil {
 		return "", err
@@ -258,7 +257,7 @@ func (p *projectRepository) GenerateSourceMapToken(tx *sql.Tx, projectId uuid.UU
 	return token, nil
 }
 
-func (p *projectRepository) Update(tx *sql.Tx, id uuid.UUID, name string, framework string, dropHealthyHealthchecks *bool, healthcheckPaths *[]string, profileLabelAllowlist *[]string, aiFlaggedTerms *[]string, aiFlaggedLanguages *[]string) (*models.Project, error) {
+func (p *projectRepository) Update(tx lit.Executor, id uuid.UUID, name string, framework string, dropHealthyHealthchecks *bool, healthcheckPaths *[]string, profileLabelAllowlist *[]string, aiFlaggedTerms *[]string, aiFlaggedLanguages *[]string) (*models.Project, error) {
 	project, err := p.FindById(tx, id)
 	if err != nil {
 		return nil, err
@@ -293,7 +292,7 @@ func (p *projectRepository) Update(tx *sql.Tx, id uuid.UUID, name string, framew
 	return project, nil
 }
 
-func (p *projectRepository) Delete(tx *sql.Tx, id uuid.UUID) error {
+func (p *projectRepository) Delete(tx lit.Executor, id uuid.UUID) error {
 	related := []string{
 		"notification_rules",
 		"notification_channels",
@@ -315,7 +314,7 @@ func (p *projectRepository) Delete(tx *sql.Tx, id uuid.UUID) error {
 	return db.NotifyProjectCacheChanged(tx, id)
 }
 
-func (p *projectRepository) FindBySourceMapToken(tx *sql.Tx, token string) (*models.Project, error) {
+func (p *projectRepository) FindBySourceMapToken(tx lit.Executor, token string) (*models.Project, error) {
 	return lit.SelectSingleNamed[models.Project](
 		tx,
 		"SELECT id, name, token, framework, organization_id, created_at, source_map_token, drop_healthy_healthchecks, healthcheck_paths, profile_label_allowlist, ai_flagged_terms, ai_flagged_languages FROM projects WHERE source_map_token = :smt",

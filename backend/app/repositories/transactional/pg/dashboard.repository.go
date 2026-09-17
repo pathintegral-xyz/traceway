@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -16,7 +15,7 @@ type dashboardRepository struct{}
 
 const dashboardColumns = "id, organization_id, name, description, definition, template_key, created_by, created_at, updated_at"
 
-func (r *dashboardRepository) FindById(tx *sql.Tx, id int) (*models.Dashboard, error) {
+func (r *dashboardRepository) FindById(tx lit.Executor, id int) (*models.Dashboard, error) {
 	return lit.SelectSingleNamed[models.Dashboard](
 		tx,
 		"SELECT "+dashboardColumns+" FROM dashboards WHERE id = :id",
@@ -24,7 +23,7 @@ func (r *dashboardRepository) FindById(tx *sql.Tx, id int) (*models.Dashboard, e
 	)
 }
 
-func (r *dashboardRepository) FindByOrganization(tx *sql.Tx, organizationId int) ([]*models.Dashboard, error) {
+func (r *dashboardRepository) FindByOrganization(tx lit.Executor, organizationId int) ([]*models.Dashboard, error) {
 	return lit.SelectNamed[models.Dashboard](
 		tx,
 		"SELECT "+dashboardColumns+" FROM dashboards WHERE organization_id = :organization_id ORDER BY name ASC, id ASC",
@@ -44,7 +43,7 @@ func (r *dashboardRepository) FindByProject(tx lit.Executor, projectId uuid.UUID
 	)
 }
 
-func (r *dashboardRepository) FindStarredDashboardsByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.Dashboard, error) {
+func (r *dashboardRepository) FindStarredDashboardsByProject(tx lit.Executor, projectId uuid.UUID) ([]*models.Dashboard, error) {
 	return lit.SelectNamed[models.Dashboard](
 		tx,
 		"SELECT "+dashboardColumns+" FROM dashboards WHERE id IN (SELECT dashboard_id FROM starred_dashboard_widgets WHERE project_id = :project_id)",
@@ -52,19 +51,19 @@ func (r *dashboardRepository) FindStarredDashboardsByProject(tx *sql.Tx, project
 	)
 }
 
-func (r *dashboardRepository) Create(tx *sql.Tx, dashboard *models.Dashboard) (int, error) {
+func (r *dashboardRepository) Create(tx lit.Executor, dashboard *models.Dashboard) (int, error) {
 	return lit.Insert[models.Dashboard](tx, dashboard)
 }
 
-func (r *dashboardRepository) Update(tx *sql.Tx, dashboard *models.Dashboard) error {
+func (r *dashboardRepository) Update(tx lit.Executor, dashboard *models.Dashboard) error {
 	return lit.UpdateNamed(tx, dashboard, "id = :id", lit.P{"id": dashboard.Id})
 }
 
-func (r *dashboardRepository) Delete(tx *sql.Tx, id int) error {
+func (r *dashboardRepository) Delete(tx lit.Executor, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM dashboards WHERE id = :id", lit.P{"id": id})
 }
 
-func (r *dashboardRepository) FindAssignmentsByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.ProjectDashboard, error) {
+func (r *dashboardRepository) FindAssignmentsByProject(tx lit.Executor, projectId uuid.UUID) ([]*models.ProjectDashboard, error) {
 	return lit.SelectNamed[models.ProjectDashboard](
 		tx,
 		"SELECT id, project_id, dashboard_id, position, created_at FROM project_dashboards WHERE project_id = :project_id ORDER BY position ASC, id ASC",
@@ -72,7 +71,7 @@ func (r *dashboardRepository) FindAssignmentsByProject(tx *sql.Tx, projectId uui
 	)
 }
 
-func (r *dashboardRepository) FindAssignmentsByDashboard(tx *sql.Tx, dashboardId int) ([]*models.ProjectDashboard, error) {
+func (r *dashboardRepository) FindAssignmentsByDashboard(tx lit.Executor, dashboardId int) ([]*models.ProjectDashboard, error) {
 	return lit.SelectNamed[models.ProjectDashboard](
 		tx,
 		"SELECT id, project_id, dashboard_id, position, created_at FROM project_dashboards WHERE dashboard_id = :dashboard_id ORDER BY id ASC",
@@ -80,7 +79,7 @@ func (r *dashboardRepository) FindAssignmentsByDashboard(tx *sql.Tx, dashboardId
 	)
 }
 
-func (r *dashboardRepository) FindAssignmentsByOrganization(tx *sql.Tx, organizationId int) ([]*models.DashboardAssignment, error) {
+func (r *dashboardRepository) FindAssignmentsByOrganization(tx lit.Executor, organizationId int) ([]*models.DashboardAssignment, error) {
 	return lit.SelectNamed[models.DashboardAssignment](
 		tx,
 		`SELECT pd.dashboard_id, pd.project_id
@@ -92,7 +91,7 @@ func (r *dashboardRepository) FindAssignmentsByOrganization(tx *sql.Tx, organiza
 	)
 }
 
-func (r *dashboardRepository) FindAssignment(tx *sql.Tx, projectId uuid.UUID, dashboardId int) (*models.ProjectDashboard, error) {
+func (r *dashboardRepository) FindAssignment(tx lit.Executor, projectId uuid.UUID, dashboardId int) (*models.ProjectDashboard, error) {
 	return lit.SelectSingleNamed[models.ProjectDashboard](
 		tx,
 		"SELECT id, project_id, dashboard_id, position, created_at FROM project_dashboards WHERE project_id = :project_id AND dashboard_id = :dashboard_id",
@@ -100,7 +99,7 @@ func (r *dashboardRepository) FindAssignment(tx *sql.Tx, projectId uuid.UUID, da
 	)
 }
 
-func (r *dashboardRepository) CreateAssignment(tx *sql.Tx, assignment *models.ProjectDashboard) error {
+func (r *dashboardRepository) CreateAssignment(tx lit.Executor, assignment *models.ProjectDashboard) error {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		`INSERT INTO project_dashboards (project_id, dashboard_id, position, created_at)
@@ -119,11 +118,11 @@ func (r *dashboardRepository) CreateAssignment(tx *sql.Tx, assignment *models.Pr
 	return lit.UpdateNative(tx, query, args...)
 }
 
-func (r *dashboardRepository) UpdateAssignment(tx *sql.Tx, assignment *models.ProjectDashboard) error {
+func (r *dashboardRepository) UpdateAssignment(tx lit.Executor, assignment *models.ProjectDashboard) error {
 	return lit.UpdateNamed(tx, assignment, "id = :id", lit.P{"id": assignment.Id})
 }
 
-func (r *dashboardRepository) DeleteAssignment(tx *sql.Tx, projectId uuid.UUID, dashboardId int) error {
+func (r *dashboardRepository) DeleteAssignment(tx lit.Executor, projectId uuid.UUID, dashboardId int) error {
 	return lit.DeleteNamed(
 		db.Driver, tx,
 		"DELETE FROM project_dashboards WHERE project_id = :project_id AND dashboard_id = :dashboard_id",
@@ -131,11 +130,11 @@ func (r *dashboardRepository) DeleteAssignment(tx *sql.Tx, projectId uuid.UUID, 
 	)
 }
 
-func (r *dashboardRepository) DeleteAssignmentsByDashboard(tx *sql.Tx, dashboardId int) error {
+func (r *dashboardRepository) DeleteAssignmentsByDashboard(tx lit.Executor, dashboardId int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM project_dashboards WHERE dashboard_id = :dashboard_id", lit.P{"dashboard_id": dashboardId})
 }
 
-func (r *dashboardRepository) FindStarredByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.StarredDashboardWidget, error) {
+func (r *dashboardRepository) FindStarredByProject(tx lit.Executor, projectId uuid.UUID) ([]*models.StarredDashboardWidget, error) {
 	return lit.SelectNamed[models.StarredDashboardWidget](
 		tx,
 		`SELECT s.id, s.project_id, s.dashboard_id, s.widget_id, s.position, s.col_span, s.size, s.created_at
@@ -147,7 +146,7 @@ func (r *dashboardRepository) FindStarredByProject(tx *sql.Tx, projectId uuid.UU
 	)
 }
 
-func (r *dashboardRepository) FindStarredByProjectAndDashboard(tx *sql.Tx, projectId uuid.UUID, dashboardId int) ([]*models.StarredDashboardWidget, error) {
+func (r *dashboardRepository) FindStarredByProjectAndDashboard(tx lit.Executor, projectId uuid.UUID, dashboardId int) ([]*models.StarredDashboardWidget, error) {
 	return lit.SelectNamed[models.StarredDashboardWidget](
 		tx,
 		"SELECT id, project_id, dashboard_id, widget_id, position, col_span, size, created_at FROM starred_dashboard_widgets WHERE project_id = :project_id AND dashboard_id = :dashboard_id ORDER BY position ASC, id ASC",
@@ -155,7 +154,7 @@ func (r *dashboardRepository) FindStarredByProjectAndDashboard(tx *sql.Tx, proje
 	)
 }
 
-func (r *dashboardRepository) FindStarredById(tx *sql.Tx, projectId uuid.UUID, id int) (*models.StarredDashboardWidget, error) {
+func (r *dashboardRepository) FindStarredById(tx lit.Executor, projectId uuid.UUID, id int) (*models.StarredDashboardWidget, error) {
 	return lit.SelectSingleNamed[models.StarredDashboardWidget](
 		tx,
 		"SELECT id, project_id, dashboard_id, widget_id, position, col_span, size, created_at FROM starred_dashboard_widgets WHERE id = :id AND project_id = :project_id",
@@ -163,7 +162,7 @@ func (r *dashboardRepository) FindStarredById(tx *sql.Tx, projectId uuid.UUID, i
 	)
 }
 
-func (r *dashboardRepository) FindStarred(tx *sql.Tx, projectId uuid.UUID, dashboardId int, widgetId string) (*models.StarredDashboardWidget, error) {
+func (r *dashboardRepository) FindStarred(tx lit.Executor, projectId uuid.UUID, dashboardId int, widgetId string) (*models.StarredDashboardWidget, error) {
 	return lit.SelectSingleNamed[models.StarredDashboardWidget](
 		tx,
 		"SELECT id, project_id, dashboard_id, widget_id, position, col_span, size, created_at FROM starred_dashboard_widgets WHERE project_id = :project_id AND dashboard_id = :dashboard_id AND widget_id = :widget_id",
@@ -171,7 +170,7 @@ func (r *dashboardRepository) FindStarred(tx *sql.Tx, projectId uuid.UUID, dashb
 	)
 }
 
-func (r *dashboardRepository) CreateStarred(tx *sql.Tx, starred *models.StarredDashboardWidget) error {
+func (r *dashboardRepository) CreateStarred(tx lit.Executor, starred *models.StarredDashboardWidget) error {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		`INSERT INTO starred_dashboard_widgets (project_id, dashboard_id, widget_id, position, col_span, size, created_at)
@@ -193,11 +192,11 @@ func (r *dashboardRepository) CreateStarred(tx *sql.Tx, starred *models.StarredD
 	return lit.UpdateNative(tx, query, args...)
 }
 
-func (r *dashboardRepository) UpdateStarred(tx *sql.Tx, starred *models.StarredDashboardWidget) error {
+func (r *dashboardRepository) UpdateStarred(tx lit.Executor, starred *models.StarredDashboardWidget) error {
 	return lit.UpdateNamed(tx, starred, "id = :id", lit.P{"id": starred.Id})
 }
 
-func (r *dashboardRepository) DeleteStarred(tx *sql.Tx, projectId uuid.UUID, dashboardId int, widgetId string) error {
+func (r *dashboardRepository) DeleteStarred(tx lit.Executor, projectId uuid.UUID, dashboardId int, widgetId string) error {
 	return lit.DeleteNamed(
 		db.Driver, tx,
 		"DELETE FROM starred_dashboard_widgets WHERE project_id = :project_id AND dashboard_id = :dashboard_id AND widget_id = :widget_id",
@@ -205,7 +204,7 @@ func (r *dashboardRepository) DeleteStarred(tx *sql.Tx, projectId uuid.UUID, das
 	)
 }
 
-func (r *dashboardRepository) DeleteStarredByProjectAndDashboard(tx *sql.Tx, projectId uuid.UUID, dashboardId int) error {
+func (r *dashboardRepository) DeleteStarredByProjectAndDashboard(tx lit.Executor, projectId uuid.UUID, dashboardId int) error {
 	return lit.DeleteNamed(
 		db.Driver, tx,
 		"DELETE FROM starred_dashboard_widgets WHERE project_id = :project_id AND dashboard_id = :dashboard_id",
@@ -213,11 +212,11 @@ func (r *dashboardRepository) DeleteStarredByProjectAndDashboard(tx *sql.Tx, pro
 	)
 }
 
-func (r *dashboardRepository) DeleteStarredByDashboard(tx *sql.Tx, dashboardId int) error {
+func (r *dashboardRepository) DeleteStarredByDashboard(tx lit.Executor, dashboardId int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM starred_dashboard_widgets WHERE dashboard_id = :dashboard_id", lit.P{"dashboard_id": dashboardId})
 }
 
-func (r *dashboardRepository) DeleteStarredByWidget(tx *sql.Tx, dashboardId int, widgetId string) error {
+func (r *dashboardRepository) DeleteStarredByWidget(tx lit.Executor, dashboardId int, widgetId string) error {
 	return lit.DeleteNamed(
 		db.Driver, tx,
 		"DELETE FROM starred_dashboard_widgets WHERE dashboard_id = :dashboard_id AND widget_id = :widget_id",

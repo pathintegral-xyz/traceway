@@ -3,7 +3,6 @@
 package pg
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -24,7 +23,7 @@ func (r *userRepository) FindByEmail(tx lit.Executor, email string) (*models.Use
 	)
 }
 
-func (r *userRepository) FindByEmailIgnoreCase(tx *sql.Tx, email string) (*models.User, error) {
+func (r *userRepository) FindByEmailIgnoreCase(tx lit.Executor, email string) (*models.User, error) {
 	return lit.SelectSingleNamed[models.User](
 		tx,
 		"SELECT "+userColumns+" FROM users WHERE LOWER(email) = LOWER(:email)",
@@ -40,7 +39,7 @@ func (r *userRepository) FindById(tx lit.Executor, id int) (*models.User, error)
 	)
 }
 
-func (r *userRepository) FindByOAuth(tx *sql.Tx, provider string, providerUserId string) (*models.User, error) {
+func (r *userRepository) FindByOAuth(tx lit.Executor, provider string, providerUserId string) (*models.User, error) {
 	return lit.SelectSingleNamed[models.User](
 		tx,
 		"SELECT "+userColumns+" FROM users WHERE oauth_provider = :provider AND oauth_user_id = :uid",
@@ -48,7 +47,7 @@ func (r *userRepository) FindByOAuth(tx *sql.Tx, provider string, providerUserId
 	)
 }
 
-func (r *userRepository) Create(tx *sql.Tx, email string, name string, hashedPassword string) (*models.User, error) {
+func (r *userRepository) Create(tx lit.Executor, email string, name string, hashedPassword string) (*models.User, error) {
 	user := &models.User{
 		Email:     email,
 		Name:      name,
@@ -65,7 +64,7 @@ func (r *userRepository) Create(tx *sql.Tx, email string, name string, hashedPas
 	return user, nil
 }
 
-func (r *userRepository) CreateOAuth(tx *sql.Tx, email, name, provider, providerUserId, avatarUrl string) (*models.User, error) {
+func (r *userRepository) CreateOAuth(tx lit.Executor, email, name, provider, providerUserId, avatarUrl string) (*models.User, error) {
 	var avatar *string
 	if avatarUrl != "" {
 		avatar = &avatarUrl
@@ -89,7 +88,7 @@ func (r *userRepository) CreateOAuth(tx *sql.Tx, email, name, provider, provider
 	return user, nil
 }
 
-func (r *userRepository) LinkOAuth(tx *sql.Tx, userId int, provider, providerUserId, avatarUrl string) error {
+func (r *userRepository) LinkOAuth(tx lit.Executor, userId int, provider, providerUserId, avatarUrl string) error {
 	q, a, err := lit.ParseNamedQuery(
 		db.Driver,
 		"UPDATE users SET oauth_provider = :provider, oauth_user_id = :uid, avatar_url = COALESCE(:avatar, avatar_url) WHERE id = :id",
@@ -121,7 +120,7 @@ func (r *userRepository) EmailExists(tx lit.Executor, email string) (bool, error
 	return user != nil, nil
 }
 
-func (r *userRepository) SetPasswordResetToken(tx *sql.Tx, userId int, token string, expiresAt time.Time) error {
+func (r *userRepository) SetPasswordResetToken(tx lit.Executor, userId int, token string, expiresAt time.Time) error {
 	q, a, err := lit.ParseNamedQuery(
 		db.Driver,
 		"UPDATE users SET password_reset_token = :token, password_reset_expires_at = :expires, password_reset_requested_at = :now WHERE id = :id",
@@ -138,7 +137,7 @@ func (r *userRepository) SetPasswordResetToken(tx *sql.Tx, userId int, token str
 	return lit.UpdateNative(tx, q, a...)
 }
 
-func (r *userRepository) ClearPasswordResetToken(tx *sql.Tx, userId int) error {
+func (r *userRepository) ClearPasswordResetToken(tx lit.Executor, userId int) error {
 	q, a, err := lit.ParseNamedQuery(db.Driver, "UPDATE users SET password_reset_token = NULL, password_reset_expires_at = NULL, password_reset_requested_at = NULL WHERE id = :id", lit.P{"id": userId})
 	if err != nil {
 		return err
@@ -147,7 +146,7 @@ func (r *userRepository) ClearPasswordResetToken(tx *sql.Tx, userId int) error {
 	return err
 }
 
-func (r *userRepository) FindByPasswordResetToken(tx *sql.Tx, token string) (*models.User, error) {
+func (r *userRepository) FindByPasswordResetToken(tx lit.Executor, token string) (*models.User, error) {
 	return lit.SelectSingleNamed[models.User](
 		tx,
 		"SELECT "+userColumns+", password_reset_token, password_reset_expires_at, password_reset_requested_at FROM users WHERE password_reset_token = :token",
@@ -155,7 +154,7 @@ func (r *userRepository) FindByPasswordResetToken(tx *sql.Tx, token string) (*mo
 	)
 }
 
-func (r *userRepository) UpdatePassword(tx *sql.Tx, userId int, hashedPassword string) error {
+func (r *userRepository) UpdatePassword(tx lit.Executor, userId int, hashedPassword string) error {
 	q, a, err := lit.ParseNamedQuery(
 		db.Driver,
 		"UPDATE users SET password = :password WHERE id = :id",

@@ -3,7 +3,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional/shared"
 	"sync"
 	"time"
@@ -18,7 +17,7 @@ type metricRegistryRepository struct {
 	knownMetrics sync.Map
 }
 
-func (r *metricRegistryRepository) EnsureRegistered(tx *sql.Tx, projectId uuid.UUID, names []string) error {
+func (r *metricRegistryRepository) EnsureRegistered(tx lit.Executor, projectId uuid.UUID, names []string) error {
 	for _, name := range names {
 		key := projectId.String() + ":" + name
 		if _, loaded := r.knownMetrics.Load(key); loaded {
@@ -55,7 +54,7 @@ func (r *metricRegistryRepository) EnsureRegistered(tx *sql.Tx, projectId uuid.U
 	return nil
 }
 
-func (r *metricRegistryRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.MetricRegistry, error) {
+func (r *metricRegistryRepository) FindByProject(tx lit.Executor, projectId uuid.UUID) ([]*models.MetricRegistry, error) {
 	return lit.SelectNamed[models.MetricRegistry](
 		tx,
 		"SELECT id, project_id, name, metric_type, unit, description, created_at FROM metric_registry WHERE project_id = :project_id ORDER BY name ASC",
@@ -63,7 +62,7 @@ func (r *metricRegistryRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID
 	)
 }
 
-func (r *metricRegistryRepository) FindByProjectAndName(tx *sql.Tx, projectId uuid.UUID, name string) (*models.MetricRegistry, error) {
+func (r *metricRegistryRepository) FindByProjectAndName(tx lit.Executor, projectId uuid.UUID, name string) (*models.MetricRegistry, error) {
 	return lit.SelectSingleNamed[models.MetricRegistry](
 		tx,
 		"SELECT id, project_id, name, metric_type, unit, description, created_at FROM metric_registry WHERE project_id = :project_id AND name = :name",
@@ -71,11 +70,11 @@ func (r *metricRegistryRepository) FindByProjectAndName(tx *sql.Tx, projectId uu
 	)
 }
 
-func (r *metricRegistryRepository) Update(tx *sql.Tx, entry *models.MetricRegistry) error {
+func (r *metricRegistryRepository) Update(tx lit.Executor, entry *models.MetricRegistry) error {
 	return lit.UpdateNamed(tx, entry, "id = :id", lit.P{"id": entry.Id})
 }
 
-func (r *metricRegistryRepository) EnsureRegisteredWithUnits(tx *sql.Tx, projectId uuid.UUID, entries []shared.MetricRegistrationEntry) error {
+func (r *metricRegistryRepository) EnsureRegisteredWithUnits(tx lit.Executor, projectId uuid.UUID, entries []shared.MetricRegistrationEntry) error {
 	for _, entry := range entries {
 		key := projectId.String() + ":" + entry.Name
 		if _, loaded := r.knownMetrics.Load(key); loaded {

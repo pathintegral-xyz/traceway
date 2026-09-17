@@ -3,7 +3,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -20,11 +19,11 @@ const outboxColumns = "id, kind, status, adapter_type, adapter_config, message, 
 // Enqueue inserts a pending row in the caller's transaction and returns its id.
 // The commit of that transaction is the durable "someone will be notified"
 // promise.
-func (r *outboxRepository) Enqueue(tx *sql.Tx, row *models.OutboxDelivery) (int, error) {
+func (r *outboxRepository) Enqueue(tx lit.Executor, row *models.OutboxDelivery) (int, error) {
 	return lit.Insert[models.OutboxDelivery](tx, row)
 }
 
-func (r *outboxRepository) FindById(tx *sql.Tx, id int) (*models.OutboxDelivery, error) {
+func (r *outboxRepository) FindById(tx lit.Executor, id int) (*models.OutboxDelivery, error) {
 	return lit.SelectSingleNamed[models.OutboxDelivery](
 		tx,
 		"SELECT "+outboxColumns+" FROM notification_outbox WHERE id = :id",
@@ -34,7 +33,7 @@ func (r *outboxRepository) FindById(tx *sql.Tx, id int) (*models.OutboxDelivery,
 
 // FindDue returns pending rows whose next_attempt_at has passed: pages first,
 // then oldest first.
-func (r *outboxRepository) FindDue(tx *sql.Tx, now time.Time, limit int) ([]*models.OutboxDelivery, error) {
+func (r *outboxRepository) FindDue(tx lit.Executor, now time.Time, limit int) ([]*models.OutboxDelivery, error) {
 	return lit.SelectNamed[models.OutboxDelivery](
 		tx,
 		"SELECT "+outboxColumns+" FROM notification_outbox WHERE status = 'pending' AND next_attempt_at <= :now ORDER BY CASE WHEN kind = 'page' THEN 0 ELSE 1 END, next_attempt_at ASC, id ASC LIMIT :limit",
@@ -45,7 +44,7 @@ func (r *outboxRepository) FindDue(tx *sql.Tx, now time.Time, limit int) ([]*mod
 // MarkSending claims one row: pending -> sending, attempts+1. The status guard
 // makes the claim lose against a concurrent cancel; returns whether the claim
 // won, and callers must not send when it lost.
-func (r *outboxRepository) MarkSending(tx *sql.Tx, id int, now time.Time) (bool, error) {
+func (r *outboxRepository) MarkSending(tx lit.Executor, id int, now time.Time) (bool, error) {
 	return guardedStatusUpdate(
 		tx,
 		"UPDATE notification_outbox SET status = 'sending', attempts = attempts + 1, claimed_at = :now WHERE id = :id AND status = 'pending'",
@@ -56,7 +55,7 @@ func (r *outboxRepository) MarkSending(tx *sql.Tx, id int, now time.Time) (bool,
 // MarkSent finalizes a delivered row. The status guard loses to a concurrent
 // cancel: a cancelled row stays cancelled even when the last send landed.
 // Returns whether the row was still sending.
-func (r *outboxRepository) MarkSent(tx *sql.Tx, id int, now time.Time) (bool, error) {
+func (r *outboxRepository) MarkSent(tx lit.Executor, id int, now time.Time) (bool, error) {
 	return guardedStatusUpdate(
 		tx,
 		"UPDATE notification_outbox SET status = 'sent', sent_at = :now, last_error = '' WHERE id = :id AND status = 'sending'",
@@ -68,7 +67,7 @@ func (r *outboxRepository) MarkSent(tx *sql.Tx, id int, now time.Time) (bool, er
 // terminal (status failed); otherwise the row returns to pending, scheduled at
 // nextAttemptAt. Guarded on status = 'sending' so cancel wins races; returns
 // whether the row was still sending.
-func (r *outboxRepository) MarkFailedWithBackoff(tx *sql.Tx, id int, errorMsg string, nextAttemptAt *time.Time, now time.Time) (bool, error) {
+func (r *outboxRepository) MarkFailedWithBackoff(tx lit.Executor, id int, errorMsg string, nextAttemptAt *time.Time, now time.Time) (bool, error) {
 	if nextAttemptAt == nil {
 		return guardedStatusUpdate(
 			tx,
@@ -86,7 +85,7 @@ func (r *outboxRepository) MarkFailedWithBackoff(tx *sql.Tx, id int, errorMsg st
 // guardedStatusUpdate runs a status-guarded UPDATE and reports whether it
 // matched: zero rows means a concurrent transition (usually a cancel or a
 // lost ack/resolve race) won.
-func guardedStatusUpdate(tx *sql.Tx, namedQuery string, params lit.P) (bool, error) {
+func guardedStatusUpdate(tx lit.Executor, namedQuery string, params lit.P) (bool, error) {
 	query, args, err := lit.ParseNamedQuery(db.Driver, namedQuery, params)
 	if err != nil {
 		return false, err
@@ -104,7 +103,7 @@ func guardedStatusUpdate(tx *sql.Tx, namedQuery string, params lit.P) (bool, err
 
 // FindCancellable returns the pending/sending rows for a cancel key, so their
 // linked page_notifications can be mirrored before the status flip.
-func (r *outboxRepository) FindCancellable(tx *sql.Tx, cancelKey string) ([]*models.OutboxDelivery, error) {
+func (r *outboxRepository) FindCancellable(tx lit.Executor, cancelKey string) ([]*models.OutboxDelivery, error) {
 	return lit.SelectNamed[models.OutboxDelivery](
 		tx,
 		"SELECT "+outboxColumns+" FROM notification_outbox WHERE cancel_key <> '' AND cancel_key = :cancel_key AND status IN ('pending', 'sending') ORDER BY id ASC",
@@ -113,7 +112,7 @@ func (r *outboxRepository) FindCancellable(tx *sql.Tx, cancelKey string) ([]*mod
 }
 
 // CancelByKey flips every pending/sending row holding the key to cancelled.
-func (r *outboxRepository) CancelByKey(tx *sql.Tx, cancelKey string, now time.Time) error {
+func (r *outboxRepository) CancelByKey(tx lit.Executor, cancelKey string, now time.Time) error {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		"UPDATE notification_outbox SET status = 'cancelled', sent_at = :now WHERE cancel_key <> '' AND cancel_key = :cancel_key AND status IN ('pending', 'sending')",
@@ -127,7 +126,7 @@ func (r *outboxRepository) CancelByKey(tx *sql.Tx, cancelKey string, now time.Ti
 
 // CancelByProject cancels a deleted project's queued rule deliveries; page
 // rows carry no project id and are cancelled by key.
-func (r *outboxRepository) CancelByProject(tx *sql.Tx, projectId uuid.UUID, now time.Time) error {
+func (r *outboxRepository) CancelByProject(tx lit.Executor, projectId uuid.UUID, now time.Time) error {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		"UPDATE notification_outbox SET status = 'cancelled', sent_at = :now WHERE project_id = :project_id AND status IN ('pending', 'sending')",
@@ -142,7 +141,7 @@ func (r *outboxRepository) CancelByProject(tx *sql.Tx, projectId uuid.UUID, now 
 // ReclaimStaleSending returns rows claimed before the cutoff (a run died
 // between claim-commit and result-commit) to pending, due immediately.
 // Attempts are NOT reset, so crash loops still reach terminal failure.
-func (r *outboxRepository) ReclaimStaleSending(tx *sql.Tx, cutoff time.Time, now time.Time) error {
+func (r *outboxRepository) ReclaimStaleSending(tx lit.Executor, cutoff time.Time, now time.Time) error {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		"UPDATE notification_outbox SET status = 'pending', next_attempt_at = :now, claimed_at = NULL WHERE status = 'sending' AND claimed_at < :cutoff",
@@ -158,7 +157,7 @@ func (r *outboxRepository) ReclaimStaleSending(tx *sql.Tx, cutoff time.Time, now
 // row per rule regardless of status (fired_notifications only exists once an
 // outcome is terminal). The max is folded in Go because SQLite loses column
 // type affinity on aggregates; the table is small (terminal rows are pruned).
-func (r *outboxRepository) LastEnqueuedPerRule(tx *sql.Tx) (map[int]time.Time, error) {
+func (r *outboxRepository) LastEnqueuedPerRule(tx lit.Executor) (map[int]time.Time, error) {
 	rows, err := lit.SelectNamed[models.OutboxRuleEnqueue](
 		tx,
 		"SELECT rule_id, created_at AS last_enqueued_at FROM notification_outbox WHERE rule_id IS NOT NULL",
@@ -176,7 +175,7 @@ func (r *outboxRepository) LastEnqueuedPerRule(tx *sql.Tx) (map[int]time.Time, e
 	return result, nil
 }
 
-func (r *outboxRepository) CountsForHealth(tx *sql.Tx) (*models.OutboxHealthCounts, error) {
+func (r *outboxRepository) CountsForHealth(tx lit.Executor) (*models.OutboxHealthCounts, error) {
 	return lit.SelectSingleNamed[models.OutboxHealthCounts](
 		tx,
 		"SELECT COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) AS pending_count, COALESCE(SUM(CASE WHEN status = 'sending' THEN 1 ELSE 0 END), 0) AS sending_count, COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) AS failed_count FROM notification_outbox",
@@ -187,7 +186,7 @@ func (r *outboxRepository) CountsForHealth(tx *sql.Tx) (*models.OutboxHealthCoun
 // OldestPending returns the pending row with the earliest next_attempt_at, or
 // nil. A plain-column select, because SQLite loses type affinity on
 // timestamp aggregates.
-func (r *outboxRepository) OldestPending(tx *sql.Tx) (*models.OutboxDelivery, error) {
+func (r *outboxRepository) OldestPending(tx lit.Executor) (*models.OutboxDelivery, error) {
 	return lit.SelectSingleNamed[models.OutboxDelivery](
 		tx,
 		"SELECT "+outboxColumns+" FROM notification_outbox WHERE status = 'pending' ORDER BY next_attempt_at ASC, id ASC LIMIT 1",
@@ -196,7 +195,7 @@ func (r *outboxRepository) OldestPending(tx *sql.Tx) (*models.OutboxDelivery, er
 }
 
 // PruneTerminal deletes finished rows past retention.
-func (r *outboxRepository) PruneTerminal(tx *sql.Tx, sentCutoff time.Time, failedCutoff time.Time) (int64, error) {
+func (r *outboxRepository) PruneTerminal(tx lit.Executor, sentCutoff time.Time, failedCutoff time.Time) (int64, error) {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		"DELETE FROM notification_outbox WHERE (status IN ('sent', 'cancelled') AND created_at < :sent_cutoff) OR (status = 'failed' AND created_at < :failed_cutoff)",

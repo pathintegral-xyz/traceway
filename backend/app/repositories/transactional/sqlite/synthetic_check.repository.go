@@ -3,7 +3,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
@@ -17,7 +16,7 @@ type syntheticCheckRepository struct{}
 
 const syntheticCheckColumns = "id, project_id, name, check_type, enabled, interval_seconds, timeout_seconds, config, failure_threshold, current_status, consecutive_failures, last_run_at, last_state_change_at, next_run_at, created_at, updated_at"
 
-func (r *syntheticCheckRepository) Create(tx *sql.Tx, check *models.SyntheticCheck) (int, error) {
+func (r *syntheticCheckRepository) Create(tx lit.Executor, check *models.SyntheticCheck) (int, error) {
 	return lit.Insert[models.SyntheticCheck](tx, check)
 }
 
@@ -25,7 +24,7 @@ func (r *syntheticCheckRepository) Create(tx *sql.Tx, check *models.SyntheticChe
 // (current_status, consecutive_failures, last_run_at, last_state_change_at)
 // belong to ApplyRunState; a full-row update here could revert a concurrent
 // executor finalization on PostgreSQL.
-func (r *syntheticCheckRepository) Update(tx *sql.Tx, check *models.SyntheticCheck) error {
+func (r *syntheticCheckRepository) Update(tx lit.Executor, check *models.SyntheticCheck) error {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		"UPDATE synthetic_checks SET name = :name, enabled = :enabled, interval_seconds = :interval_seconds, timeout_seconds = :timeout_seconds, config = :config, failure_threshold = :failure_threshold, next_run_at = :next_run_at, updated_at = :updated_at WHERE id = :id",
@@ -47,11 +46,11 @@ func (r *syntheticCheckRepository) Update(tx *sql.Tx, check *models.SyntheticChe
 	return lit.UpdateNative(tx, query, args...)
 }
 
-func (r *syntheticCheckRepository) Delete(tx *sql.Tx, id int, projectId uuid.UUID) error {
+func (r *syntheticCheckRepository) Delete(tx lit.Executor, id int, projectId uuid.UUID) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM synthetic_checks WHERE id = :id AND project_id = :project_id", lit.P{"id": id, "project_id": projectId})
 }
 
-func (r *syntheticCheckRepository) FindById(tx *sql.Tx, id int) (*models.SyntheticCheck, error) {
+func (r *syntheticCheckRepository) FindById(tx lit.Executor, id int) (*models.SyntheticCheck, error) {
 	return lit.SelectSingleNamed[models.SyntheticCheck](
 		tx,
 		"SELECT "+syntheticCheckColumns+" FROM synthetic_checks WHERE id = :id",
@@ -59,7 +58,7 @@ func (r *syntheticCheckRepository) FindById(tx *sql.Tx, id int) (*models.Synthet
 	)
 }
 
-func (r *syntheticCheckRepository) FindByIdForProject(tx *sql.Tx, id int, projectId uuid.UUID) (*models.SyntheticCheck, error) {
+func (r *syntheticCheckRepository) FindByIdForProject(tx lit.Executor, id int, projectId uuid.UUID) (*models.SyntheticCheck, error) {
 	return lit.SelectSingleNamed[models.SyntheticCheck](
 		tx,
 		"SELECT "+syntheticCheckColumns+" FROM synthetic_checks WHERE id = :id AND project_id = :project_id",
@@ -67,7 +66,7 @@ func (r *syntheticCheckRepository) FindByIdForProject(tx *sql.Tx, id int, projec
 	)
 }
 
-func (r *syntheticCheckRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.SyntheticCheck, error) {
+func (r *syntheticCheckRepository) FindByProject(tx lit.Executor, projectId uuid.UUID) ([]*models.SyntheticCheck, error) {
 	return lit.SelectNamed[models.SyntheticCheck](
 		tx,
 		"SELECT "+syntheticCheckColumns+" FROM synthetic_checks WHERE project_id = :project_id ORDER BY name ASC, id ASC",
@@ -77,7 +76,7 @@ func (r *syntheticCheckRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID
 
 // FindDueEnabled returns enabled checks whose next run time has passed,
 // oldest-due first.
-func (r *syntheticCheckRepository) FindDueEnabled(tx *sql.Tx, now time.Time, limit int) ([]*models.SyntheticCheck, error) {
+func (r *syntheticCheckRepository) FindDueEnabled(tx lit.Executor, now time.Time, limit int) ([]*models.SyntheticCheck, error) {
 	return lit.SelectNamed[models.SyntheticCheck](
 		tx,
 		"SELECT "+syntheticCheckColumns+" FROM synthetic_checks WHERE enabled = true AND next_run_at <= :now ORDER BY next_run_at ASC, id ASC LIMIT :limit",
@@ -88,7 +87,7 @@ func (r *syntheticCheckRepository) FindDueEnabled(tx *sql.Tx, now time.Time, lim
 // SetNextRun advances the schedule pointer. Called in the same transaction
 // that enqueues the run row, so multi-instance schedulers (behind the
 // advisory lock) never double-enqueue an interval.
-func (r *syntheticCheckRepository) SetNextRun(tx *sql.Tx, id int, nextRunAt time.Time) error {
+func (r *syntheticCheckRepository) SetNextRun(tx lit.Executor, id int, nextRunAt time.Time) error {
 	query, args, err := lit.ParseNamedQuery(
 		db.Driver,
 		"UPDATE synthetic_checks SET next_run_at = :next_run_at WHERE id = :id",
@@ -102,7 +101,7 @@ func (r *syntheticCheckRepository) SetNextRun(tx *sql.Tx, id int, nextRunAt time
 
 // ApplyRunState persists the outcome of one executed run on the check row.
 // lastStateChangeAt is only written on transitions (nil leaves it untouched).
-func (r *syntheticCheckRepository) ApplyRunState(tx *sql.Tx, id int, currentStatus string, consecutiveFailures int, lastRunAt time.Time, lastStateChangeAt *time.Time) error {
+func (r *syntheticCheckRepository) ApplyRunState(tx lit.Executor, id int, currentStatus string, consecutiveFailures int, lastRunAt time.Time, lastStateChangeAt *time.Time) error {
 	if lastStateChangeAt != nil {
 		query, args, err := lit.ParseNamedQuery(
 			db.Driver,
@@ -127,7 +126,7 @@ func (r *syntheticCheckRepository) ApplyRunState(tx *sql.Tx, id int, currentStat
 
 // FindByIdInOrganization scopes a check lookup to an organization (status
 // pages reference checks across all the org's projects).
-func (r *syntheticCheckRepository) FindByIdInOrganization(tx *sql.Tx, id int, organizationId int) (*models.SyntheticCheck, error) {
+func (r *syntheticCheckRepository) FindByIdInOrganization(tx lit.Executor, id int, organizationId int) (*models.SyntheticCheck, error) {
 	return lit.SelectSingleNamed[models.SyntheticCheck](
 		tx,
 		"SELECT c.id, c.project_id, c.name, c.check_type, c.enabled, c.interval_seconds, c.timeout_seconds, c.config, c.failure_threshold, c.current_status, c.consecutive_failures, c.last_run_at, c.last_state_change_at, c.next_run_at, c.created_at, c.updated_at FROM synthetic_checks c JOIN projects p ON p.id = c.project_id WHERE c.id = :id AND p.organization_id = :organization_id",
@@ -135,7 +134,7 @@ func (r *syntheticCheckRepository) FindByIdInOrganization(tx *sql.Tx, id int, or
 	)
 }
 
-func (r *syntheticCheckRepository) FindByOrganization(tx *sql.Tx, organizationId int) ([]*models.SyntheticCheck, error) {
+func (r *syntheticCheckRepository) FindByOrganization(tx lit.Executor, organizationId int) ([]*models.SyntheticCheck, error) {
 	return lit.SelectNamed[models.SyntheticCheck](
 		tx,
 		"SELECT c.id, c.project_id, c.name, c.check_type, c.enabled, c.interval_seconds, c.timeout_seconds, c.config, c.failure_threshold, c.current_status, c.consecutive_failures, c.last_run_at, c.last_state_change_at, c.next_run_at, c.created_at, c.updated_at FROM synthetic_checks c JOIN projects p ON p.id = c.project_id WHERE p.organization_id = :organization_id ORDER BY c.name ASC, c.id ASC",
@@ -143,7 +142,7 @@ func (r *syntheticCheckRepository) FindByOrganization(tx *sql.Tx, organizationId
 	)
 }
 
-func (r *syntheticCheckRepository) CountDownByOrganization(tx *sql.Tx, organizationId int) (int, error) {
+func (r *syntheticCheckRepository) CountDownByOrganization(tx lit.Executor, organizationId int) (int, error) {
 	result, err := lit.SelectSingleNamed[models.CountResult](
 		tx,
 		"SELECT COUNT(*) as count FROM synthetic_checks c JOIN projects p ON p.id = c.project_id WHERE p.organization_id = :organization_id AND c.enabled = true AND c.current_status = 'down'",
@@ -158,7 +157,7 @@ func (r *syntheticCheckRepository) CountDownByOrganization(tx *sql.Tx, organizat
 	return result.Count, nil
 }
 
-func (r *syntheticCheckRepository) CountDownAll(tx *sql.Tx) (int, error) {
+func (r *syntheticCheckRepository) CountDownAll(tx lit.Executor) (int, error) {
 	result, err := lit.SelectSingleNamed[models.CountResult](
 		tx,
 		"SELECT COUNT(*) as count FROM synthetic_checks WHERE enabled = true AND current_status = 'down'",
@@ -173,7 +172,7 @@ func (r *syntheticCheckRepository) CountDownAll(tx *sql.Tx) (int, error) {
 	return result.Count, nil
 }
 
-func (r *syntheticCheckRepository) CountDownByProject(tx *sql.Tx, projectId uuid.UUID) (int, error) {
+func (r *syntheticCheckRepository) CountDownByProject(tx lit.Executor, projectId uuid.UUID) (int, error) {
 	result, err := lit.SelectSingleNamed[models.CountResult](
 		tx,
 		"SELECT COUNT(*) as count FROM synthetic_checks WHERE project_id = :project_id AND enabled = true AND current_status = 'down'",
