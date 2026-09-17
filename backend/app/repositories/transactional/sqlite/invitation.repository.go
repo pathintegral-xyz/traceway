@@ -48,7 +48,7 @@ func (r *invitationRepository) FindByToken(tx *sql.Tx, token string) (*models.In
 	)
 }
 
-func (r *invitationRepository) FindByOrganization(tx *sql.Tx, organizationId int) ([]*models.InvitationWithInviter, error) {
+func (r *invitationRepository) FindByOrganization(tx lit.Executor, organizationId int) ([]*models.InvitationWithInviter, error) {
 	return lit.SelectNamed[models.InvitationWithInviter](
 		tx,
 		`SELECT i.id, i.organization_id, i.email, i.role, i.invited_by, u.name as inviter_name, i.status, i.expires_at, i.accepted_at, i.created_at

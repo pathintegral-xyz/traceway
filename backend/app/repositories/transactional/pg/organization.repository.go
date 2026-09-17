@@ -61,7 +61,7 @@ func (r *organizationRepository) FindByName(tx *sql.Tx, name string) (*models.Or
 	)
 }
 
-func (r *organizationRepository) FindById(tx *sql.Tx, id int) (*models.Organization, error) {
+func (r *organizationRepository) FindById(tx lit.Executor, id int) (*models.Organization, error) {
 	return lit.SelectSingleNamed[models.Organization](
 		tx,
 		"SELECT id, name, timezone, created_at FROM organizations WHERE id = :id",
@@ -128,7 +128,7 @@ func (r *organizationRepository) CountMembers(tx *sql.Tx, organizationId int) (i
 	return result.Count, nil
 }
 
-func (r *organizationRepository) GetMembersWithDetails(tx *sql.Tx, organizationId int) ([]*models.OrganizationMember, error) {
+func (r *organizationRepository) GetMembersWithDetails(tx lit.Executor, organizationId int) ([]*models.OrganizationMember, error) {
 	return lit.SelectNamed[models.OrganizationMember](
 		tx,
 		`SELECT u.id, u.email, u.name, ou.role, ou.created_at
