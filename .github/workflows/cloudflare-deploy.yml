@@ -65,6 +65,10 @@ jobs:
       - name: Generate Stage Worker configuration
         working-directory: deploy/cloudflare
         run: node scripts/write-wrangler-config.mjs
+      - name: Upload Stage Worker secrets
+        working-directory: deploy/cloudflare
+        run: |
+          node -e 'process.stdout.write(JSON.stringify({JWT_SECRET: process.env.JWT_SECRET, CLOUDFLARE_D1_API_TOKEN: process.env.CLOUDFLARE_D1_API_TOKEN, S3_ACCESS_KEY: process.env.S3_ACCESS_KEY, S3_SECRET_KEY: process.env.S3_SECRET_KEY}))' | npx wrangler secret bulk --config runtime/wrangler.generated.jsonc
       - name: Deploy Stage Worker and Container
         uses: cloudflare/wrangler-action@v4
         with:
@@ -73,11 +77,6 @@ jobs:
           wranglerVersion: "4.132.0"
           workingDirectory: deploy/cloudflare
           command: deploy --config runtime/wrangler.generated.jsonc
-          secrets: |
-            JWT_SECRET
-            CLOUDFLARE_D1_API_TOKEN
-            S3_ACCESS_KEY
-            S3_SECRET_KEY
       - name: Deployment summary
         run: echo "Stage deployed from $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
 
@@ -124,6 +123,10 @@ jobs:
       - name: Generate Production Worker configuration
         working-directory: deploy/cloudflare
         run: node scripts/write-wrangler-config.mjs
+      - name: Upload Production Worker secrets
+        working-directory: deploy/cloudflare
+        run: |
+          node -e 'process.stdout.write(JSON.stringify({JWT_SECRET: process.env.JWT_SECRET, CLOUDFLARE_D1_API_TOKEN: process.env.CLOUDFLARE_D1_API_TOKEN, S3_ACCESS_KEY: process.env.S3_ACCESS_KEY, S3_SECRET_KEY: process.env.S3_SECRET_KEY}))' | npx wrangler secret bulk --config runtime/wrangler.generated.jsonc
       - name: Deploy Production Worker and Container
         uses: cloudflare/wrangler-action@v4
         with:
@@ -132,10 +135,5 @@ jobs:
           wranglerVersion: "4.132.0"
           workingDirectory: deploy/cloudflare
           command: deploy --config runtime/wrangler.generated.jsonc
-          secrets: |
-            JWT_SECRET
-            CLOUDFLARE_D1_API_TOKEN
-            S3_ACCESS_KEY
-            S3_SECRET_KEY
       - name: Deployment summary
         run: echo "Production deployed from immutable commit ${{ inputs.ref }}." >> "$GITHUB_STEP_SUMMARY"
