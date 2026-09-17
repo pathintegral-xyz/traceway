@@ -31,10 +31,8 @@ const orgOverviewMaxIssueFetch = 1000
 // orgOverviewProjects loads the organization's projects in one short
 // transaction: the fan-out handlers run their telemetry queries outside any
 // tx so the single-connection SQLite main DB is never held across them.
-func orgOverviewProjects(organizationId int) ([]*models.Project, error) {
-	projects, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
-		return transactional.ProjectRepository.FindByOrganizationId(tx, organizationId)
-	})
+func orgOverviewProjects(ctx context.Context, organizationId int) ([]*models.Project, error) {
+	projects, err := transactional.ProjectRepository.FindByOrganizationId(db.MainExecutor(ctx), organizationId)
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +63,9 @@ type orgServerRow struct {
 	K8sNodeName     string                   `json:"k8sNodeName"`
 }
 
-func orgServerDashboardIds(organizationId int) (map[uuid.UUID]int, error) {
-	return db.ExecuteTransaction(func(tx *sql.Tx) (map[uuid.UUID]int, error) {
+func orgServerDashboardIds(ctx context.Context, organizationId int) (map[uuid.UUID]int, error) {
+	tx := db.MainExecutor(ctx)
+	return func() (map[uuid.UUID]int, error) {
 		dashboards, err := transactional.DashboardRepository.FindByOrganization(tx, organizationId)
 		if err != nil {
 			return nil, err
@@ -90,7 +89,7 @@ func orgServerDashboardIds(organizationId int) (map[uuid.UUID]int, error) {
 			}
 		}
 		return result, nil
-	})
+	}()
 }
 
 func clampPercent(value float64) float64 {
@@ -340,12 +339,12 @@ func loadProjectServerRows(ctx *gin.Context, project *models.Project, dashboardI
 
 func (c *organizationOverviewController) Servers(ctx *gin.Context) {
 	organizationId := middleware.GetOrganizationId(ctx)
-	projects, err := orgOverviewProjects(organizationId)
+	projects, err := orgOverviewProjects(ctx.Request.Context(), organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list organization projects: %w", err))
 		return
 	}
-	dashboardIds, err := orgServerDashboardIds(organizationId)
+	dashboardIds, err := orgServerDashboardIds(ctx.Request.Context(), organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to resolve organization server dashboards: %w", err))
 		return
@@ -471,7 +470,7 @@ func (c *organizationOverviewController) Issues(ctx *gin.Context) {
 		return
 	}
 
-	projects, err := orgOverviewProjects(organizationId)
+	projects, err := orgOverviewProjects(ctx.Request.Context(), organizationId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list organization projects: %w", err))
 		return
@@ -671,7 +670,8 @@ func (c *organizationOverviewController) Monitors(ctx *gin.Context) {
 		projects []*models.Project
 		checks   []*models.SyntheticCheck
 	}
-	data, err := db.ExecuteTransaction(func(tx *sql.Tx) (*orgMonitorsData, error) {
+	tx := db.MainExecutor(ctx.Request.Context())
+	data, err := func() (*orgMonitorsData, error) {
 		projects, err := transactional.ProjectRepository.FindByOrganizationId(tx, organizationId)
 		if err != nil {
 			return nil, err
@@ -681,7 +681,7 @@ func (c *organizationOverviewController) Monitors(ctx *gin.Context) {
 			return nil, err
 		}
 		return &orgMonitorsData{projects: projects, checks: checks}, nil
-	})
+	}()
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list organization monitors: %w", err))
 		return
