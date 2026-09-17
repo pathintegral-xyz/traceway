@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"math"
 	"net/http"
