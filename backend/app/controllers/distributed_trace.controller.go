@@ -53,9 +53,7 @@ func (d distributedTraceController) GetDistributedTrace(c *gin.Context) {
 
 	userId := middleware.GetUserId(c)
 
-	projects, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
-		return transactional.ProjectRepository.FindByUserId(tx, userId)
-	})
+	projects, err := transactional.ProjectRepository.FindByUserId(db.MainExecutor(c), userId)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to load user projects: %w", err))
 		return

@@ -370,7 +370,8 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 		page   *models.StatusPage
 		checks []*models.SyntheticCheck
 	}
-	loaded, err := db.ExecuteTransaction(func(tx *sql.Tx) (pageWithChecks, error) {
+	tx := db.MainExecutor(ctx)
+	loaded, err := func() (pageWithChecks, error) {
 		page, err := transactional.StatusPageRepository.FindPublicBySlug(tx, slug)
 		if err != nil || page == nil {
 			return pageWithChecks{}, err
@@ -391,7 +392,7 @@ func buildStatusPageView(ctx *gin.Context, slug string, now time.Time) (*statusP
 			}
 		}
 		return pageWithChecks{page: page, checks: checks}, nil
-	})
+	}()
 	if err != nil || loaded.page == nil {
 		return nil, err
 	}
