@@ -9,7 +9,27 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type transactionMode uint8
+
+const (
+	transactionRequired transactionMode = iota
+	transactionRead
+	transactionCommand
+)
+
 func Transactional(c *gin.Context) {
+	switch cloudflareTransactionMode(c.FullPath()) {
+	case transactionRead:
+		c.Next()
+		return
+	case transactionCommand:
+		if !bufferRequestBody(c, maxTransactionalBodyBytes) {
+			return
+		}
+		c.Next()
+		return
+	}
+
 	if !bufferRequestBody(c, maxTransactionalBodyBytes) {
 		return
 	}
@@ -44,31 +64,6 @@ func Transactional(c *gin.Context) {
 	} else {
 		txHandle.Rollback()
 	}
-}
-
-// TransactionalCommand preserves the native transaction contract while a
-// command has a Cloudflare D1 batch implementation. It must only wrap routes
-// whose controller selects that implementation when db.IsCloudflare is true.
-func TransactionalCommand(c *gin.Context) {
-	if db.IsCloudflare() {
-		if !bufferRequestBody(c, maxTransactionalBodyBytes) {
-			return
-		}
-		c.Next()
-		return
-	}
-	Transactional(c)
-}
-
-// TransactionalRead preserves a request transaction on native deployments.
-// D1 reads use the shared main executor directly because D1 does not expose
-// database/sql transactions.
-func TransactionalRead(c *gin.Context) {
-	if db.IsCloudflare() {
-		c.Next()
-		return
-	}
-	Transactional(c)
 }
 
 const commitHooksContextKey = "txCommitHooks"

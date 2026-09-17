@@ -76,7 +76,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 
 	router.GET("/projects", middleware.UseAppAuth, ProjectController.ListProjects)
 	router.POST("/projects", middleware.UseAppAuth, middleware.RequireProjectAccess, ProjectController.CreateProject)
-	router.POST("/projects/batch", middleware.UseAppAuth, middleware.TransactionalCommand, ProjectController.BatchCreateProjects)
+	router.POST("/projects/batch", middleware.UseAppAuth, middleware.Transactional, ProjectController.BatchCreateProjects)
 	router.PUT("/projects", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, ProjectController.UpdateProject)
 	router.DELETE("/projects", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, ProjectController.DeleteProject)
 
@@ -102,7 +102,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.GET("/metrics/discover/org", middleware.UseAppAuth, MetricQueryController.DiscoverOrg)
 	router.PUT("/metrics/registry", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, MetricQueryController.UpdateRegistry)
 
-	router.GET("/dashboards", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.TransactionalRead, DashboardsController.List)
+	router.GET("/dashboards", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.Transactional, DashboardsController.List)
 	router.POST("/dashboards", middleware.UseAppAuth, middleware.Transactional, DashboardsController.Create)
 	router.GET("/dashboards/library", middleware.UseAppAuth, middleware.Transactional, DashboardsController.Library)
 	router.POST("/dashboards/populate-defaults", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, DashboardsController.PopulateDefaults)
@@ -177,9 +177,9 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.POST("/exception-stack-traces/:hash", middleware.UseAppAuth, middleware.RequireProjectAccess, ExceptionStackTraceController.FindByHash)
 
 	// Keep the limiter before Transactional so rejected requests don't open a transaction.
-	router.POST("/login", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.TransactionalCommand, AuthController.Login)
-	router.POST("/register", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.TransactionalCommand, AuthController.Register)
-	router.GET("/me/login-bundle", middleware.UseAppAuth, middleware.TransactionalCommand, AuthController.LoginBundle)
+	router.POST("/login", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.Transactional, AuthController.Login)
+	router.POST("/register", middleware.RateLimitPerIP(10, time.Minute), middleware.BufferAuthBody, middleware.Transactional, AuthController.Register)
+	router.GET("/me/login-bundle", middleware.UseAppAuth, middleware.Transactional, AuthController.LoginBundle)
 
 	router.GET("/auth/providers", OAuthController.ListProviders)
 	router.GET("/auth/start/:provider", middleware.RateLimitPerIP(20, time.Minute), middleware.Transactional, OAuthController.Begin)
@@ -219,7 +219,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	// at the origin root, not under /api.
 
 	if config.Config.CloudMode != "true" {
-		router.GET("/has-organizations", middleware.TransactionalRead, AuthController.HasOrganizations)
+		router.GET("/has-organizations", middleware.Transactional, AuthController.HasOrganizations)
 	}
 
 	// slightly tighter limit since every accepted request sends an email
