@@ -61,7 +61,13 @@ export default {
 			r2SecretKey: Boolean(envVars.S3_SECRET_KEY)
 		});
 		try {
-			await container.start({ envVars });
+			await container.startAndWaitForPorts({
+				startOptions: { envVars },
+				cancellationOptions: {
+					instanceGetTimeoutMS: 15000,
+					portReadyTimeoutMS: 30000
+				}
+			});
 			return await container.fetch(request);
 		} catch (error) {
 			console.error('Traceway container failed to start', {
