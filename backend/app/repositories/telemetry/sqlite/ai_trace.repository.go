@@ -264,8 +264,8 @@ func (r *aiTraceRepository) FindGroupedByTraceName(ctx context.Context, projectI
 			AVG(input_tokens) AS avg_input_tokens,
 			AVG(output_tokens) AS avg_output_tokens,
 			MAX(recorded_at) AS last_seen,
-			MAX(is_root) AS has_root,
-			MAX(CASE WHEN is_root = 0 THEN 1 ELSE 0 END) AS has_non_root
+			CASE WHEN MAX(is_root) <> 0 THEN 'true' ELSE 'false' END AS has_root,
+			CASE WHEN MAX(CASE WHEN is_root = 0 THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END AS has_non_root
 		FROM ai_traces WHERE `+whereClause+`
 		GROUP BY trace_name`, params)
 	if err != nil {

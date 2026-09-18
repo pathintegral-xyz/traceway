@@ -265,9 +265,9 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 		SUM(CASE WHEN e.duration <= (750000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.status_code < 500 THEN 1 ELSE 0 END) as satisfied_count,
 		SUM(CASE WHEN e.duration > (750000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.duration <= (1500000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.status_code < 500 THEN 1 ELSE 0 END) as tolerating_count,
 		SUM(CASE WHEN e.duration > (1500000000 + COALESCE(s.offset_ms, 0) * 1000000) OR e.status_code >= 500 THEN 1 ELSE 0 END) as bad_count,
-		MAX(e.is_stream) as is_stream,
-		MAX(e.is_root) as has_root,
-		MAX(CASE WHEN e.is_root = 0 THEN 1 ELSE 0 END) as has_non_root
+		CASE WHEN MAX(e.is_stream) <> 0 THEN 'true' ELSE 'false' END as is_stream,
+		CASE WHEN MAX(e.is_root) <> 0 THEN 'true' ELSE 'false' END as has_root,
+		CASE WHEN MAX(CASE WHEN e.is_root = 0 THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as has_non_root
 	FROM endpoints e
 	LEFT JOIN slow_endpoints s ON e.endpoint = s.endpoint AND e.project_id = s.project_id
 	WHERE ` + whereClause + `
