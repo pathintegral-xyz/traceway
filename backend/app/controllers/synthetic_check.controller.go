@@ -184,7 +184,7 @@ func (ctrl *syntheticCheckController) Overview(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	checks, err := transactional.SyntheticCheckRepository.FindByProject(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list synthetic checks: %w", err))
