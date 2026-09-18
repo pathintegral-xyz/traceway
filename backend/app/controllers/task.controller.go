@@ -1,6 +1,10 @@
 package controllers
 
 import (
+	"strings"
+
+	"github.com/tracewayapp/traceway/backend/app/config"
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories/telemetry"
@@ -13,6 +17,14 @@ import (
 )
 
 type taskController struct{}
+
+func taskQueryError(c *gin.Context, err error, message string) {
+	if db.IsCloudflare() && config.Config != nil && strings.Contains(config.Config.AppBaseURL, ".dev.") {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("%s: %w", message, err))
+}
 
 type TaskSearchRequest struct {
 	FromDate      time.Time        `json:"fromDate"`
@@ -87,7 +99,7 @@ func (e taskController) FindGroupedByTaskName(c *gin.Context) {
 	stats, total, err := telemetry.TaskRepository.FindGroupedByTaskName(c, projectId, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy, request.SortDirection, request.Search, request.RootFilter)
 	span.End()
 	if err != nil {
-		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading stats by name: %w", err))
+		taskQueryError(c, err, "error loading stats by name")
 		return
 	}
 
