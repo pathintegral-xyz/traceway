@@ -55,8 +55,10 @@ func openD1(databaseID string) (*sql.DB, *d1http.Connector, error) {
 		return nil, nil, err
 	}
 	database := sql.OpenDB(connector)
-	database.SetMaxOpenConns(16)
-	database.SetMaxIdleConns(16)
+	// D1 serializes work per database. Keep the HTTPS client pool small so a
+	// dashboard fan-out does not turn into a burst that D1 rejects as overloaded.
+	database.SetMaxOpenConns(4)
+	database.SetMaxIdleConns(4)
 	if err := database.Ping(); err != nil {
 		database.Close()
 		return nil, nil, err

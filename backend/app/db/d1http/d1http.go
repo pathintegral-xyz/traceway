@@ -181,7 +181,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	}
 }
 
-const d1ReadRetryAttempts = 2
+const d1ReadRetryAttempts = 4
 
 func isRetryableReadError(err error) bool {
 	var apiErr apiError
@@ -196,7 +196,7 @@ func isRetryableReadError(err error) bool {
 }
 
 func waitBeforeD1ReadRetry(ctx context.Context, attempt int) error {
-	delay := time.Duration(50*(1<<attempt)) * time.Millisecond
+	delay := time.Duration(100*(1<<attempt)) * time.Millisecond
 	timer := time.NewTimer(delay)
 	defer timer.Stop()
 	select {
