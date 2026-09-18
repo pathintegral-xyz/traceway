@@ -167,11 +167,44 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 }
 
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	result, err := c.query(ctx, query, args)
-	if err != nil {
-		return nil, err
+	for attempt := 0; ; attempt++ {
+		result, err := c.query(ctx, query, args)
+		if err == nil {
+			return &rows{columns: result.Results.Columns, values: result.Results.Rows}, nil
+		}
+		if attempt >= d1ReadRetryAttempts || !isRetryableReadError(err) {
+			return nil, err
+		}
+		if err := waitBeforeD1ReadRetry(ctx, attempt); err != nil {
+			return nil, err
+		}
 	}
-	return &rows{columns: result.Results.Columns, values: result.Results.Rows}, nil
+}
+
+const d1ReadRetryAttempts = 2
+
+func isRetryableReadError(err error) bool {
+	var apiErr apiError
+	if errors.As(err, &apiErr) {
+		if apiErr.status == http.StatusTooManyRequests || apiErr.status >= 500 {
+			return true
+		}
+		message := strings.ToLower(apiErr.messages)
+		return strings.Contains(message, "overload") || strings.Contains(message, "busy") || strings.Contains(message, "temporar")
+	}
+	return false
+}
+
+func waitBeforeD1ReadRetry(ctx context.Context, attempt int) error {
+	delay := time.Duration(50*(1<<attempt)) * time.Millisecond
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (c *conn) query(ctx context.Context, query string, args []driver.NamedValue) (queryResult, error) {
