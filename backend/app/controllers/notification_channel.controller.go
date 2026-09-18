@@ -264,9 +264,7 @@ func (ctrl *notificationChannelController) Test(ctx *gin.Context) {
 		return
 	}
 
-	channel, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.NotificationChannel, error) {
-		return transactional.NotificationChannelRepository.FindById(tx, id)
-	})
+	channel, err := transactional.NotificationChannelRepository.FindById(db.MainExecutor(ctx), id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find notification channel: %w", err))
 		return
