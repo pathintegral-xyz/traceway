@@ -324,6 +324,15 @@ func toDriverValue(value any, column string) (driver.Value, error) {
 	case nil:
 		return nil, nil
 	case string:
+		// D1's raw API may encode SQLite boolean expressions (for example
+		// MAX(is_root)) as the strings "true" and "false". Normalize those
+		// values before database/sql scans them into bool fields.
+		if typed == "true" {
+			return true, nil
+		}
+		if typed == "false" {
+			return false, nil
+		}
 		if isTimestampColumn(column) {
 			timestamp, ok := parseTimestamp(typed)
 			if ok {
