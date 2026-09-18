@@ -87,7 +87,7 @@ func (e taskController) FindGroupedByTaskName(c *gin.Context) {
 	stats, total, err := telemetry.TaskRepository.FindGroupedByTaskName(c, projectId, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy, request.SortDirection, request.Search, request.RootFilter)
 	span.End()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading stats by name: %w", err))
 		return
 	}
 

@@ -102,10 +102,8 @@ async function request(method: string, endpoint: string, data?: unknown, options
 	}
 
 	if (!response.ok) {
-		const body = await response.json().catch(() => ({}));
-		throw Object.assign(new Error(body.error || `API Error: ${response.statusText}`), {
-			status: response.status,
-			body
+		throw Object.assign(new Error(`API Error: ${response.statusText}`), {
+			status: response.status
 		});
 	}
 

@@ -54,7 +54,26 @@ function canRetryContainerRequest(request: Request): boolean {
 	if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
 		return true;
 	}
-	return new URL(request.url).pathname === '/api/synthetics/overview';
+	// These POST endpoints only read telemetry. Retrying them after a container
+	// rollout is safe and prevents transient container-start failures from
+	// surfacing as dashboard 500s. Mutating and ingest endpoints stay out of
+	// this list so a retry can never duplicate a write.
+	return new Set([
+		'/api/tasks/grouped',
+		'/api/endpoints/grouped',
+		'/api/exception-stack-traces',
+		'/api/profiles/grouped',
+		'/api/profiles/labels',
+		'/api/profiles/dimensions',
+		'/api/profiles/flamegraph',
+		'/api/profiles/top',
+		'/api/ai-users/grouped',
+		'/api/ai-traces/grouped',
+		'/api/ai-conversations/grouped',
+		'/api/logs',
+		'/api/sessions',
+		'/api/synthetics/overview'
+	]).has(new URL(request.url).pathname);
 }
 
 async function startWhenReady(
