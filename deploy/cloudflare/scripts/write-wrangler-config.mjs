@@ -21,6 +21,9 @@ const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 config.name = process.env.TRACEWAY_WORKER_NAME;
 config.account_id = accountId;
 config.routes = [{ pattern: process.env.TRACEWAY_DOMAIN, custom_domain: true }];
+config.containers[0].image_vars = {
+	TRACEWAY_REVISION: process.env.GITHUB_SHA || 'local'
+};
 config.vars = {
 	CLOUDFLARE_ACCOUNT_ID: accountId,
 	CLOUDFLARE_D1_MAIN_DATABASE_ID: process.env.TRACEWAY_MAIN_D1_DATABASE_ID,

@@ -1,4 +1,5 @@
 ARG NODE_VERSION=26
+ARG TRACEWAY_REVISION=dev
 
 FROM --platform=linux/amd64 node:${NODE_VERSION}-alpine AS frontend-builder
 
@@ -21,7 +22,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=mod -tags cloudflare -ld
 
 FROM alpine:3.20
 
-LABEL org.opencontainers.image.revision="b7598199"
+LABEL org.opencontainers.image.revision="${TRACEWAY_REVISION}"
 RUN apk add --no-cache ca-certificates tzdata
 COPY --from=backend-builder /traceway /usr/local/bin/traceway
 USER nobody
