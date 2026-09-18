@@ -50,6 +50,26 @@ function runtimeEnv(env: Env): Record<string, string> {
 	};
 }
 
+function canRetryContainerRequest(request: Request): boolean {
+	if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
+		return true;
+	}
+	return new URL(request.url).pathname === '/api/synthetics/overview';
+}
+
+async function startWhenReady(
+	container: Pick<TracewayContainer, 'startAndWaitForPorts'>,
+	envVars: Record<string, string>
+): Promise<void> {
+	await container.startAndWaitForPorts({
+		startOptions: { envVars },
+		cancellationOptions: {
+			instanceGetTimeoutMS: 15000,
+			portReadyTimeoutMS: 30000
+		}
+	});
+}
+
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const container = getContainer(env.TRACEWAY, 'primary');
@@ -61,14 +81,14 @@ export default {
 			r2SecretKey: Boolean(envVars.S3_SECRET_KEY)
 		});
 		try {
-			await container.startAndWaitForPorts({
-				startOptions: { envVars },
-				cancellationOptions: {
-					instanceGetTimeoutMS: 15000,
-					portReadyTimeoutMS: 30000
-				}
-			});
-			return await container.fetch(request);
+			await startWhenReady(container, envVars);
+			const response = await container.fetch(request.clone() as unknown as Request);
+			if (response.status < 500 || !canRetryContainerRequest(request)) {
+				return response;
+			}
+
+			await startWhenReady(container, envVars);
+			return await container.fetch(request as unknown as Request);
 		} catch (error) {
 			console.error('Traceway container failed to start', {
 				error: error instanceof Error ? error.message : String(error),
