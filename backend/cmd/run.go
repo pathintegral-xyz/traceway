@@ -35,7 +35,6 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/synthetics"
 	"github.com/tracewayapp/traceway/backend/static"
 
-	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	traceway "go.tracewayapp.com"
@@ -325,7 +324,7 @@ func Run(opts ...Option) {
 		}(listener)
 	}
 
-	notifySystemd()
+	notifySystemd(ctx)
 	config.Logln("Starting server on " + listeners[0].Addr().String())
 	serveHTTP(router, listeners[0])
 }
@@ -503,25 +502,6 @@ func parsePositiveInt(s string, def int) int {
 		return def
 	}
 	return v
-}
-
-func notifySystemd() {
-	sent, err := daemon.SdNotify(false, daemon.SdNotifyReady)
-	if err != nil {
-		config.Logf("Failed to notify systemd: %v", err)
-	} else if sent {
-		config.Logln("Notified systemd that service is ready")
-	}
-
-	go func() {
-		defer traceway.Recover()
-
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			daemon.SdNotify(false, daemon.SdNotifyWatchdog)
-		}
-	}()
 }
 
 func mustSubFS(fsys fs.FS, dir string) fs.FS {
