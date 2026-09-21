@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,14 +18,17 @@ import (
 type MoveOverOptions struct {
 	// PageSize bounds the rows held in memory at once. Zero means the default.
 	PageSize int
+	// Workers copies this many distinct source days concurrently. Zero means one.
+	Workers int
 	// Oldest, when set, is the last day moved. History before it stays in the old tables.
 	Oldest time.Time
 	Log    func(format string, args ...any)
 }
 
 const (
-	defaultPageSize = 20000
-	moveOverDay     = 24 * time.Hour
+	defaultPageSize          = 20000
+	moveOverDay              = 24 * time.Hour
+	moveOverProgressInterval = 10 * time.Second
 	// An owner is recorded near its spans and exceptions, not at the same instant: an endpoint at its start, an old
 	// OTel task at its end.
 	ownerWindow = moveOverDay
@@ -33,20 +37,23 @@ const (
 // Entities before what hangs off them, so a day is usable as soon as its endpoints are in.
 var tableOrder = []string{"endpoints", "tasks", "ai_traces", "exception_stack_traces", "spans"}
 
+type moveOverLegacy interface {
+	OccurrenceTime(table string, at time.Time) time.Time
+	FindEndpoints(ctx context.Context, from, to time.Time, limit int, offset *int) ([]models.Endpoint, error)
+	FindTasks(ctx context.Context, from, to time.Time, limit int, offset *int) ([]models.Task, error)
+	FindAiTraces(ctx context.Context, from, to time.Time, limit int, offset *int) ([]models.AiTrace, error)
+	FindExceptions(ctx context.Context, from, to time.Time, limit int, offset *int) ([]shared.LegacyException, error)
+	FindSpans(ctx context.Context, from, to time.Time, limit int, offset *int) ([]shared.LegacySpan, error)
+	FindOwners(ctx context.Context, ids []uuid.UUID, from, to time.Time) ([]models.Endpoint, []models.Task, []models.AiTrace, error)
+	FindBounds(ctx context.Context, table string) (oldest, newest time.Time, found bool, err error)
+	FindMovedIds(ctx context.Context, table string, ids []uuid.UUID, from, to time.Time) (map[shared.MovedOccurrence]bool, error)
+	FindMovedSpans(ctx context.Context, traceIds []string, from, to time.Time) (map[string]bool, error)
+}
+
 type mover struct {
 	MoveOverOptions
-	legacy interface {
-		OccurrenceTime(table string, at time.Time) time.Time
-		FindEndpoints(ctx context.Context, from, to time.Time, limit int, offset *int) ([]models.Endpoint, error)
-		FindTasks(ctx context.Context, from, to time.Time, limit int, offset *int) ([]models.Task, error)
-		FindAiTraces(ctx context.Context, from, to time.Time, limit int, offset *int) ([]models.AiTrace, error)
-		FindExceptions(ctx context.Context, from, to time.Time, limit int, offset *int) ([]shared.LegacyException, error)
-		FindSpans(ctx context.Context, from, to time.Time, limit int, offset *int) ([]shared.LegacySpan, error)
-		FindOwners(ctx context.Context, ids []uuid.UUID, from, to time.Time) ([]models.Endpoint, []models.Task, []models.AiTrace, error)
-		FindBounds(ctx context.Context, table string) (oldest, newest time.Time, found bool, err error)
-		FindMovedIds(ctx context.Context, table string, ids []uuid.UUID, from, to time.Time) (map[shared.MovedOccurrence]bool, error)
-		FindMovedSpans(ctx context.Context, traceIds []string, from, to time.Time) (map[string]bool, error)
-	}
+	logMu    sync.Mutex
+	legacy   moveOverLegacy
 	progress interface {
 		FindProgress(ctx context.Context) ([]transactional.MoveOverDay, error)
 		SaveProgress(ctx context.Context, day transactional.MoveOverDay) error
@@ -54,8 +61,8 @@ type mover struct {
 }
 
 // RunMoveOver copies history from the tables V2 replaced into the V2 tables. It runs inside the backend, because the
-// embedded DuckDB file cannot be opened by a second process. It goes newest day first, so recent data is back first,
-// one day of one table at a time, and records each finished day so it can stop and resume. It returns when history is
+// embedded DuckDB file cannot be opened by a second process. It schedules distinct days newest first, keeping the
+// table order within each day, and records each finished table/day so it can stop and resume. It returns when history is
 // exhausted, the context ends, or a read or a write fails. Running it again picks up where it stopped.
 func RunMoveOver(ctx context.Context, options MoveOverOptions) error {
 	m := &mover{MoveOverOptions: options, legacy: LegacyRepository, progress: moveOverProgress{}}
@@ -68,6 +75,9 @@ func (m *mover) run(ctx context.Context) error {
 	}
 	if m.PageSize <= 0 {
 		m.PageSize = defaultPageSize
+	}
+	if m.Workers <= 0 {
+		m.Workers = 1
 	}
 	if m.Log == nil {
 		m.Log = func(format string, args ...any) { log.Printf("[tracewaybackend] move-over: "+format, args...) }
@@ -102,14 +112,14 @@ func (m *mover) run(ctx context.Context) error {
 		}
 	}
 	if len(bounds) == 0 {
-		m.Log("the old tables are empty, nothing to move")
+		m.log("the old tables are empty, nothing to move")
 		return nil
 	}
 	if limit := m.Oldest.UTC().Truncate(moveOverDay); !m.Oldest.IsZero() && limit.After(oldest) {
 		oldest = limit
 	}
 
-	for current := newest; !current.Before(oldest); current = current.Add(-moveOverDay) {
+	moveSourceDay := func(ctx context.Context, current time.Time) error {
 		for _, table := range tableOrder {
 			held, known := bounds[table]
 			label := current.Format(time.DateOnly)
@@ -124,6 +134,7 @@ func (m *mover) run(ctx context.Context) error {
 				return fmt.Errorf("move-over progress of %s %s: %w", table, label, err)
 			}
 			began := time.Now()
+			m.log("%s %s: starting (resumed=%t)", label, table, resumed)
 			rows, err := m.moveDay(ctx, table, current, resumed)
 			if err != nil {
 				return fmt.Errorf("move-over of %s %s: %w", table, label, err)
@@ -131,17 +142,78 @@ func (m *mover) run(ctx context.Context) error {
 			if err := m.progress.SaveProgress(ctx, transactional.MoveOverDay{Table: table, Day: label, State: transactional.MoveOverDone, Rows: rows}); err != nil {
 				return fmt.Errorf("move-over progress of %s %s: %w", table, label, err)
 			}
-			m.Log("%s %s: %d rows in %s", label, table, rows, time.Since(began).Round(time.Millisecond))
+			m.log("%s %s: %d rows in %s", label, table, rows, time.Since(began).Round(time.Millisecond))
+		}
+		return nil
+	}
+	m.log("starting pass from %s back to %s with %d workers", newest.Format(time.DateOnly), oldest.Format(time.DateOnly), m.Workers)
+	if err := runMoveOverDays(ctx, newest, oldest, m.Workers, moveSourceDay); err != nil {
+		return err
+	}
+	m.log("done, every day from %s back to %s is in the V2 tables", newest.Format(time.DateOnly), oldest.Format(time.DateOnly))
+	return nil
+}
+
+func (m *mover) log(format string, args ...any) {
+	m.logMu.Lock()
+	defer m.logMu.Unlock()
+	m.Log(format, args...)
+}
+
+func runMoveOverDays(ctx context.Context, newest, oldest time.Time, concurrency int, move func(context.Context, time.Time) error) error {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	days := make(chan time.Time)
+	var workers sync.WaitGroup
+	for range concurrency {
+		workers.Go(func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					cancel(fmt.Errorf("move-over worker panicked: %v", recovered))
+				}
+			}()
+			for day := range days {
+				if ctx.Err() != nil {
+					return
+				}
+				if err := move(ctx, day); err != nil {
+					cancel(err)
+					return
+				}
+			}
+		})
+	}
+schedule:
+	for day := newest; !day.Before(oldest); day = day.Add(-moveOverDay) {
+		select {
+		case <-ctx.Done():
+			break schedule
+		case days <- day:
 		}
 	}
-	m.Log("done, every day from %s back to %s is in the V2 tables", newest.Format(time.DateOnly), oldest.Format(time.DateOnly))
-	return nil
+	close(days)
+	workers.Wait()
+	return context.Cause(ctx)
 }
 
 // moveDay walks one day in slices narrow enough to hold in memory. A slice that comes back full is halved and read
 // again, so no read sorts a day. Only a single second that is still too full is paged, in a stable full-row order.
 func (m *mover) moveDay(ctx context.Context, table string, start time.Time, resumed bool) (int64, error) {
 	var total int64
+	began := time.Now()
+	lastProgress := began
+	reportProgress := func() error {
+		if time.Since(lastProgress) < moveOverProgressInterval {
+			return nil
+		}
+		label := start.Format(time.DateOnly)
+		if err := m.progress.SaveProgress(ctx, transactional.MoveOverDay{Table: table, Day: label, State: transactional.MoveOverStarted, Rows: total}); err != nil {
+			return fmt.Errorf("save progress: %w", err)
+		}
+		m.log("%s %s: in progress, %d source rows processed in %s", label, table, total, time.Since(began).Round(time.Millisecond))
+		lastProgress = time.Now()
+		return nil
+	}
 	width, end := time.Hour, start.Add(moveOverDay)
 	for cursor := start; cursor.Before(end); {
 		if err := ctx.Err(); err != nil {
@@ -162,16 +234,23 @@ func (m *mover) moveDay(ctx context.Context, table string, start time.Time, resu
 				width = max(to.Sub(cursor)/2, time.Second).Truncate(time.Second)
 				continue
 			}
+			total += moved
 		} else {
 			for offset, full := 0, true; full; {
 				page, more, err := m.move(ctx, table, cursor, to, &offset, resumed)
 				if err != nil {
 					return total, err
 				}
-				moved, full, offset = moved+page, more, offset+int(page)
+				moved, total, full, offset = moved+page, total+page, more, offset+int(page)
+				if err := reportProgress(); err != nil {
+					return total, err
+				}
 			}
 		}
-		total, cursor = total+moved, to
+		cursor = to
+		if err := reportProgress(); err != nil {
+			return total, err
+		}
 		// A sparse stretch widens the slice again, or one busy second would leave the rest of the day read second by second.
 		if moved*2 <= int64(m.PageSize) {
 			width = min(width*2, moveOverDay)

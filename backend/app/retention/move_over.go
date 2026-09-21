@@ -23,7 +23,7 @@ func startMoveOver(ctx context.Context, telemetryRetentionDays int) {
 	if err != nil || !enabled {
 		return
 	}
-	options := telemetry.MoveOverOptions{}
+	options := telemetry.MoveOverOptions{Workers: parseMoveOverWorkers(cfg.V2MoveOverWorkers)}
 	if oldest := strings.TrimSpace(cfg.V2MoveOverOldest); oldest != "" {
 		if options.Oldest, err = time.Parse(time.DateOnly, oldest); err != nil {
 			log.Printf("[tracewaybackend] move-over: V2_MOVE_OVER_OLDEST %q is not a YYYY-MM-DD date, not starting", oldest)
@@ -40,6 +40,14 @@ func startMoveOver(ctx context.Context, telemetryRetentionDays int) {
 			}
 		})
 	}()
+}
+
+func parseMoveOverWorkers(value string) int {
+	workers, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || workers < 1 {
+		return 1
+	}
+	return min(workers, 16)
 }
 
 func moveOverOptionsForRun(options telemetry.MoveOverOptions, retentionDays int, now time.Time) telemetry.MoveOverOptions {

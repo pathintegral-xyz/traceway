@@ -62,14 +62,17 @@ Add these settings to your existing backend configuration and restart or recreat
 V2_MOVE_OVER=true
 # Optional: copy this UTC source date and newer dates.
 V2_MOVE_OVER_OLDEST=2026-09-01
+# Optional: copy four source days concurrently in this instance.
+V2_MOVE_OVER_WORKERS=4
 ```
 
 The date is an example; replace it with your desired oldest day or omit it. For Docker Compose, add the settings to the backend service's existing `environment` block and recreate that service. A plain container restart does not change its environment. Preserve the service's other settings and volume mounts.
 
 | Variable | Default | Behavior |
 |----------|---------|----------|
-| `V2_MOVE_OVER` | unset; disabled | `true` enables one background worker in this backend process |
+| `V2_MOVE_OVER` | unset; disabled | `true` enables background copying in this backend process |
 | `V2_MOVE_OVER_OLDEST` | unset | Inclusive oldest UTC source day, formatted `YYYY-MM-DD`; older days are left in the old tables |
+| `V2_MOVE_OVER_WORKERS` | `1` | Number of source days copied concurrently in this instance; capped at `16`. Unset, invalid or non-positive values use `1` |
 
 An invalid oldest date is logged and the worker does not start. An unset, false or unparseable `V2_MOVE_OVER` leaves the worker disabled.
 
@@ -79,7 +82,7 @@ On SQLite and DuckDB, the oldest source day is constrained by both the configure
 
 ## How copying works
 
-The worker processes the newest UTC source day first, then walks backward. Within each day it copies:
+The worker schedules UTC source days newest first, then walks backward. `V2_MOVE_OVER_WORKERS=4` allows four distinct days to copy at once; when one finishes, that worker takes the next day. Completed table/day pairs are skipped, and interrupted pairs are resumed. Within each day it copies:
 
 ```text
 endpoints → tasks → ai_traces → exception_stack_traces → spans
@@ -87,9 +90,11 @@ endpoints → tasks → ai_traces → exception_stack_traces → spans
 
 History becomes visible progressively as batches are inserted. An occurrence can appear before its child spans and exceptions have been copied; a day is not published atomically.
 
+Parallel days use the same conversion and recovery rules as a single worker. Spans and exceptions resolve their owners from the legacy tables, so they do not need another day's V2 copy to finish first. Keep the setting on exactly one backend instance: day assignments are coordinated inside that process, not across replicas.
+
 Each primary source read returns at most 20,000 rows. It starts with a one-hour window. A full result may be truncated, so the worker halves the window and reads again before writing. Once a window is only one second wide, a full result is paged using a stable order over all copied source values. Sparse windows grow again.
 
-This bounds the source page size, not total memory or I/O. Large attributes, owner lookups, sorting and destination inserts still compete with live traffic. There is no configurable throughput limiter. Keep legacy source rows unchanged while copying: do not import, manually delete or mutate them during a pass. Account for automatic retention when selecting the history to preserve.
+This bounds each worker's source page size, not total memory or I/O. Large attributes, owner lookups, sorting and destination inserts still compete with live traffic. For faster backfill, start with `V2_MOVE_OVER_WORKERS=4` and watch database CPU, memory, disk and ingest latency before increasing it. More workers help only while the database has spare capacity; SQLite's single writer limits the benefit there. There is no configurable throughput limiter. Keep legacy source rows unchanged while copying: do not import, manually delete or mutate them during a pass. Account for automatic retention when selecting the history to preserve.
 
 ## Progress and verification
 
@@ -107,12 +112,15 @@ ORDER BY day DESC, source_table;
 | `started` | The table/day is in progress or was interrupted; inspect backend logs to distinguish them |
 | `done` | The pass completed this table/day without a reported error; later passes skip it |
 
-`updated_at` changes when a table/day is started or completed; it is not a per-batch heartbeat. `moved_rows` is recorded on completion and counts processed source rows, including rows skipped during recovery. It is not the number of newly inserted V2 rows or a live progress counter.
+`updated_at` and `moved_rows` update at the start, after successful batches roughly every 10 seconds, and on completion. A slow query or insert can delay the next update; this is not a heartbeat independent of copying. `moved_rows` counts processed source rows in the current attempt, including rows skipped during recovery. It resets when an interrupted table/day is resumed and is not the number of newly inserted V2 rows. With multiple workers, several dates can be `started` at the same time.
 
 Backend logs use the `move-over:` prefix. For example:
 
 ```text
-move-over: 2026-09-19 spans: 23677 rows in 1.0s
+move-over: starting pass from 2026-09-19 back to 2026-09-01 with 4 workers
+move-over: 2026-09-19 spans: starting (resumed=false)
+move-over: 2026-09-19 spans: in progress, 18000 source rows processed in 10.1s
+move-over: 2026-09-19 spans: 23677 rows in 13.0s
 move-over: done, every day from 2026-09-19 back to 2026-09-01 is in the V2 tables
 ```
 
@@ -124,7 +132,7 @@ Leave the setting enabled to retry remaining work hourly, or disable it and rest
 
 Set `V2_MOVE_OVER=false` or remove it, then restart/recreate the worker instance to stop background copying. Already copied rows remain available. Re-enable it later to resume; retain the main database and its progress records along with the telemetry database.
 
-Before writing a table/day, the worker commits a `started` marker. It writes spans before their corresponding endpoint, task or AI rows, and records `done` after the day completes. A read, write or progress error stops the pass, logs the failure and leaves unfinished work resumable. A rejected canonical span also prevents that day from being marked complete. Persistent errors require correcting the cause; retrying does not bypass invalid data or insufficient disk space.
+Before writing a table/day, the worker commits a `started` marker. It writes spans before their corresponding endpoint, task or AI rows, and records `done` after the day completes. A read, write or progress error cancels the pass and waits for all workers to stop before retrying. Completed pairs remain `done`; unfinished pairs remain resumable. A rejected canonical span also prevents that day from being marked complete. Persistent errors require correcting the cause; retrying does not bypass invalid data or insufficient disk space.
 
 Recovery rescans the unfinished day rather than resuming a saved page offset. It skips destination rows already found using these identities:
 

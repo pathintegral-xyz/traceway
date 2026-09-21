@@ -250,6 +250,14 @@ func seedLegacyDay(t *testing.T, project uuid.UUID, at time.Time, trace uuid.UUI
 }
 
 func TestMoveOverBringsHistoryIntoTheV2Tables(t *testing.T) {
+	for _, workers := range []int{1, 3} {
+		t.Run(fmt.Sprintf("workers=%d", workers), func(t *testing.T) {
+			testMoveOverBringsHistoryIntoTheV2Tables(t, workers)
+		})
+	}
+}
+
+func testMoveOverBringsHistoryIntoTheV2Tables(t *testing.T, workers int) {
 	setupTestDB(t)
 	setupMoveOverProgress(t)
 	legacyReset(t)
@@ -263,8 +271,10 @@ func TestMoveOverBringsHistoryIntoTheV2Tables(t *testing.T) {
 	}
 
 	var moved []string
-	options := MoveOverOptions{PageSize: 2, Oldest: today.AddDate(0, 0, -1), Log: func(format string, args ...any) {
-		moved = append(moved, strings.SplitN(fmt.Sprintf(format, args...), ":", 2)[0])
+	options := MoveOverOptions{PageSize: 2, Workers: workers, Oldest: today.AddDate(0, 0, -1), Log: func(format string, args ...any) {
+		if format == "%s %s: %d rows in %s" {
+			moved = append(moved, strings.SplitN(fmt.Sprintf(format, args...), ":", 2)[0])
+		}
 	}}
 	if err := RunMoveOver(ctx, options); err != nil {
 		t.Fatal(err)
@@ -275,8 +285,36 @@ func TestMoveOverBringsHistoryIntoTheV2Tables(t *testing.T) {
 			order = append(order, strings.Fields(line)[0])
 		}
 	}
+	if workers > 1 {
+		sort.Sort(sort.Reverse(sort.StringSlice(order)))
+	}
 	if want := []string{today.Format(time.DateOnly), today.AddDate(0, 0, -1).Format(time.DateOnly)}; fmt.Sprint(order) != fmt.Sprint(want) {
 		t.Fatalf("newest day first, and nothing older than asked for: %v", order)
+	}
+	for _, day := range order {
+		var tables []string
+		for _, line := range moved {
+			fields := strings.Fields(line)
+			if fields[0] == day {
+				tables = append(tables, fields[1])
+			}
+		}
+		if got := strings.Join(tables, ","); got != "endpoints,tasks,exception_stack_traces,spans" {
+			t.Fatalf("table order within %s: %s", day, got)
+		}
+	}
+	progress, err := (moveOverProgress{}).FindProgress(ctx)
+	if err != nil || len(progress) != 8 {
+		t.Fatalf("want progress for four tables on two days: %+v, %v", progress, err)
+	}
+	for _, day := range progress {
+		wantRows := int64(1)
+		if day.Table == "spans" {
+			wantRows = 3
+		}
+		if day.State != transactional.MoveOverDone || day.Rows != wantRows {
+			t.Errorf("incorrect completed source-row count: %+v", day)
+		}
 	}
 
 	window := today

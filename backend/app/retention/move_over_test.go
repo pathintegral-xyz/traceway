@@ -55,11 +55,11 @@ func TestMoveOverScheduleDoesNotStartWhenCancelled(t *testing.T) {
 
 func TestMoveOverRecomputesRetentionForEachPass(t *testing.T) {
 	now := time.Date(2026, 9, 20, 1, 0, 0, 0, time.FixedZone("UTC+2", 2*60*60))
-	options := telemetry.MoveOverOptions{Oldest: now.AddDate(0, 0, -90), PageSize: 25}
+	options := telemetry.MoveOverOptions{Oldest: now.AddDate(0, 0, -90), PageSize: 25, Workers: 4}
 	for _, elapsed := range []int{0, 10} {
 		current := now.AddDate(0, 0, elapsed)
 		got := moveOverOptionsForRun(options, 30, current)
-		if !got.Oldest.Equal(current.UTC().AddDate(0, 0, -30)) || got.Oldest.Location() != time.UTC || got.PageSize != 25 {
+		if !got.Oldest.Equal(current.UTC().AddDate(0, 0, -30)) || got.Oldest.Location() != time.UTC || got.PageSize != 25 || got.Workers != 4 {
 			t.Fatalf("retention window at day %d: %+v", elapsed, got)
 		}
 	}
@@ -69,5 +69,13 @@ func TestMoveOverRecomputesRetentionForEachPass(t *testing.T) {
 	options.Oldest = now.AddDate(0, 0, -2)
 	if got := moveOverOptionsForRun(options, 30, now); !got.Oldest.Equal(options.Oldest) {
 		t.Fatal("a newer operator lower bound must win")
+	}
+}
+
+func TestMoveOverWorkers(t *testing.T) {
+	for value, want := range map[string]int{"": 1, "0": 1, "-1": 1, "invalid": 1, "1": 1, " 4 ": 4, "16": 16, "100": 16} {
+		if got := parseMoveOverWorkers(value); got != want {
+			t.Errorf("workers %q = %d, want %d", value, got, want)
+		}
 	}
 }
