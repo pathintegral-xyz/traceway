@@ -322,13 +322,17 @@ func runEndpointsShow(cmd *cobra.Command, args []string) error {
 				formatDuration(e.Duration), e.StatusCode,
 				pickStr(e.ServerName, "-"), pickStr(e.AppVersion, "-"),
 			)
-			if e.DistributedTraceId != nil {
-				_, _ = fmt.Fprintf(out, "TRACE ID:     %s\n", e.DistributedTraceId.String())
-			}
+			renderTraceId(out, e.TraceId)
 		}
 		renderSpansTable(out, resp.Spans)
 		renderLinkedErrors(out, resp.Exception, resp.Messages)
 		return nil
+	}
+}
+
+func renderTraceId(out io.Writer, traceId string) {
+	if traceId != "" {
+		_, _ = fmt.Fprintf(out, "TRACE ID:     %s\n", traceId)
 	}
 }
 
