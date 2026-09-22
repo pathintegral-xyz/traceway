@@ -355,7 +355,7 @@ func (m *mover) insertSpans(ctx context.Context, spans []models.Span, from, to t
 func (m *mover) writeEndpoints(ctx context.Context, rows []models.Endpoint, from, to time.Time, resumed bool) error {
 	ids := make([]uuid.UUID, len(rows))
 	for i, row := range rows {
-		ids[i] = row.Id
+		ids[i] = legacyId(row.Id, row.ProjectId, row.RecordedAt, row.Duration, row.Endpoint)
 	}
 	moved, err := m.movedIds(ctx, "endpoints", ids, from, to, resumed)
 	if err != nil {
@@ -379,7 +379,7 @@ func (m *mover) writeEndpoints(ctx context.Context, rows []models.Endpoint, from
 func (m *mover) writeTasks(ctx context.Context, rows []models.Task, from, to time.Time, resumed bool) error {
 	ids := make([]uuid.UUID, len(rows))
 	for i, row := range rows {
-		ids[i] = row.Id
+		ids[i] = legacyId(row.Id, row.ProjectId, row.RecordedAt, row.Duration, row.TaskName)
 		// Legacy OTel tasks stored their end time, with no upper bound on duration.
 		if start := row.RecordedAt.Add(-row.Duration); row.SpanId != "" && start.Before(from) {
 			from = start
@@ -407,7 +407,7 @@ func (m *mover) writeTasks(ctx context.Context, rows []models.Task, from, to tim
 func (m *mover) writeAiTraces(ctx context.Context, rows []models.AiTrace, from, to time.Time, resumed bool) error {
 	ids := make([]uuid.UUID, len(rows))
 	for i, row := range rows {
-		ids[i] = row.Id
+		ids[i] = legacyId(row.Id, row.ProjectId, row.RecordedAt, row.Duration, row.TraceName)
 	}
 	moved, err := m.movedIds(ctx, "ai_traces", ids, from, to, resumed)
 	if err != nil {
@@ -545,16 +545,28 @@ const (
 
 func hexId(id uuid.UUID) string { return shared.NormalizeTraceId(id.String()) }
 
+// legacyId stands in for the nil UUID, which the old ingest stored whenever a client sent it as a run or span id. The
+// stand-in is derived from the row, so it differs between rows and is the same on every read of one.
+func legacyId(id, projectId uuid.UUID, at time.Time, duration time.Duration, name string) uuid.UUID {
+	if id != uuid.Nil {
+		return id
+	}
+	return uuid.NewSHA1(projectId, fmt.Appendf(nil, "%d|%d|%s", at.UnixNano(), duration, name))
+}
+
 func validTraceId(id string) bool {
 	return len(id) == 32 && id != zeroPadding+zeroPadding && strings.Trim(id, "0123456789abcdef") == ""
 }
 
 // spanHex undoes the old storage of an OTel span id, which was kept as a UUID with eight zero bytes in front. A native
-// id is a real UUID and stays 32 characters.
+// id is a real UUID and stays 32 characters. An all-zero id is no id.
 func spanHex(id string) string {
 	id = shared.NormalizeTraceId(id)
 	if len(id) == 32 && strings.HasPrefix(id, zeroPadding) {
-		return id[16:]
+		id = id[16:]
+	}
+	if strings.Trim(id, "0") == "" {
+		return ""
 	}
 	return id
 }
@@ -580,6 +592,7 @@ func withoutIdentity(attributes map[string]string) map[string]string {
 }
 
 func mapEndpoint(row models.Endpoint) (models.Endpoint, models.Span) {
+	row.Id = legacyId(row.Id, row.ProjectId, row.RecordedAt, row.Duration, row.Endpoint)
 	row.TraceId = traceIdFromLegacy(row.Attributes, row.TraceId, row.Id)
 	if row.SpanId = spanHex(row.SpanId); row.SpanId == "" {
 		row.SpanId = hexId(row.Id)
@@ -594,6 +607,7 @@ func mapEndpoint(row models.Endpoint) (models.Endpoint, models.Span) {
 }
 
 func mapTask(row models.Task) (models.Task, models.Span) {
+	row.Id = legacyId(row.Id, row.ProjectId, row.RecordedAt, row.Duration, row.TaskName)
 	row.TraceId = traceIdFromLegacy(row.Attributes, row.TraceId, row.Id)
 	kind := int32(spanKindConsumer)
 	if row.SpanId = spanHex(row.SpanId); row.SpanId == "" {
@@ -608,6 +622,7 @@ func mapTask(row models.Task) (models.Task, models.Span) {
 }
 
 func mapAiTrace(row models.AiTrace) (models.AiTrace, models.Span) {
+	row.Id = legacyId(row.Id, row.ProjectId, row.RecordedAt, row.Duration, row.TraceName)
 	row.TraceId = traceIdFromLegacy(row.Attributes, row.TraceId, row.Id)
 	// The old table kept no span id. A call below the root was stored under its span id. The root was stored under the
 	// trace id, which serves as its span id here: it only has to be the same on the row and on the span.
@@ -627,7 +642,7 @@ func mapException(legacy shared.LegacyException, owners ownerIndex) models.Excep
 	ownerId, err := uuid.Parse(row.TraceId)
 	row.Attributes, row.SpanId = withoutIdentity(row.Attributes), ""
 	switch found, known := owners.nearest(row.ProjectId, ownerId, row.RecordedAt); {
-	case err != nil:
+	case err != nil, ownerId == uuid.Nil && !known:
 		row.TraceId, row.TraceType = distributed, ""
 	case known:
 		row.TraceId, row.SpanId = found.traceId, found.spanId
@@ -638,15 +653,16 @@ func mapException(legacy shared.LegacyException, owners ownerIndex) models.Excep
 }
 
 func mapSpan(row shared.LegacySpan, owners ownerIndex) models.Span {
-	span := models.Span{ProjectId: row.ProjectId, TraceId: hexId(row.OwnerId), SpanId: spanHex(row.Id.String()), ParentSpanId: spanHex(row.ParentSpanId),
-		Name: row.Name, StartTime: row.StartTime, RecordedAt: row.RecordedAt, Duration: row.Duration, Attributes: withoutIdentity(row.Attributes)}
+	run := hexId(legacyId(row.OwnerId, row.ProjectId, row.RecordedAt, 0, ""))
+	span := models.Span{ProjectId: row.ProjectId, TraceId: run, SpanId: spanHex(legacyId(row.Id, row.ProjectId, row.StartTime, row.Duration, row.Name).String()),
+		ParentSpanId: spanHex(row.ParentSpanId), Name: row.Name, StartTime: row.StartTime, RecordedAt: row.RecordedAt, Duration: row.Duration, Attributes: withoutIdentity(row.Attributes)}
 	found, known := owners.nearest(row.ProjectId, row.OwnerId, row.RecordedAt)
 	if known {
 		span.TraceId, span.ServiceName = found.traceId, found.serverName
 	}
 	if span.ParentSpanId == "" {
 		// Only a native span was stored without a parent. It hangs under its run, whose span id is the run's own id.
-		if span.ParentSpanId = hexId(row.OwnerId); known {
+		if span.ParentSpanId = run; known {
 			span.ParentSpanId = found.spanId
 		}
 	}

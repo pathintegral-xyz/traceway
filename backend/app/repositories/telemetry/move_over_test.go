@@ -144,6 +144,9 @@ func TestMoveOverIds(t *testing.T) {
 	if got := spanHex(""); got != "" {
 		t.Errorf("no id stays no id: %q", got)
 	}
+	if got := spanHex(uuid.Nil.String()); got != "" {
+		t.Errorf("a zero id is no id: %q", got)
+	}
 
 	recorded := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
 	task, span := mapTask(models.Task{Id: paddedSpan(5), TaskName: "settle", TraceId: trace.String(), SpanId: paddedSpan(5).String(), RecordedAt: recorded, Duration: time.Minute,
@@ -223,6 +226,60 @@ func TestMoveOverZeroDistributedIDKeepsNativeGraph(t *testing.T) {
 	owner, err := FindExceptionOwner(ctx, *exc)
 	if err != nil || owner == nil || owner.Name != endpoint.Endpoint {
 		t.Fatalf("migrated exception owner: %+v %v", owner, err)
+	}
+}
+
+func TestMoveOverNilIdsGetStandIns(t *testing.T) {
+	setupTestDB(t)
+	setupMoveOverProgress(t)
+	legacyReset(t)
+	t.Cleanup(func() { legacyReset(t) })
+	ctx := context.Background()
+	at := time.Now().UTC().Truncate(moveOverDay).Add(10 * time.Hour)
+	project, exception := uuid.New(), uuid.New()
+	for _, recorded := range []time.Time{at, at.Add(time.Second)} {
+		legacyExec(t, `INSERT INTO endpoints (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_stream, is_root)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, uuid.Nil, project, "GET /nil", int64(time.Second), recorded, 200, 0, "", "{}", "1.0", "api", (*uuid.UUID)(nil), (*uuid.UUID)(nil), false, true)
+	}
+	legacyExec(t, `INSERT INTO spans (id, trace_id, project_id, name, start_time, duration, recorded_at, parent_span_id, attributes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, uuid.Nil, uuid.Nil, project, "child", at, int64(time.Millisecond), at, &uuid.Nil, "{}")
+	legacyExec(t, `INSERT INTO exception_stack_traces (id, project_id, trace_id, trace_type, exception_hash, stack_trace, recorded_at, attributes, app_version, server_name, is_message, distributed_trace_id, session_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, exception, project, &uuid.Nil, "endpoint", "nil-run", "Error: nil run", at, "{}", "1.0", "api", false, (*uuid.UUID)(nil), (*uuid.UUID)(nil))
+	if err := RunMoveOver(ctx, MoveOverOptions{Log: func(string, ...any) {}}); err != nil {
+		t.Fatal(err)
+	}
+	first, second := legacyId(uuid.Nil, project, at, time.Second, "GET /nil"), legacyId(uuid.Nil, project, at.Add(time.Second), time.Second, "GET /nil")
+	if first == uuid.Nil || first == second {
+		t.Fatalf("each nil run needs its own stand-in: %s %s", first, second)
+	}
+	endpoint, err := EndpointRepository.FindById(ctx, project, first, &at)
+	if err != nil || endpoint == nil || endpoint.TraceId != hexId(first) || endpoint.SpanId != hexId(first) {
+		t.Fatalf("migrated endpoint: %+v %v", endpoint, err)
+	}
+	if got := moveOverRowCount(t, "endpoints_v2"); got != 2 {
+		t.Fatalf("endpoints_v2 rows = %d, want 2", got)
+	}
+	graph, err := SpanRepository.FindTrace(ctx, []uuid.UUID{project}, hexId(first), at)
+	if err != nil || len(graph.Spans) != 2 {
+		t.Fatalf("migrated root and child: %+v %v", graph, err)
+	}
+	for _, span := range graph.Spans {
+		if span.SpanId != hexId(first) && span.ParentSpanId != hexId(first) {
+			t.Fatalf("a child with a nil parent hangs under its run: %+v", span)
+		}
+	}
+	exc, err := ExceptionStackTraceRepository.FindById(ctx, project, exception, &at)
+	if err != nil || exc == nil || exc.TraceId != hexId(first) || exc.SpanId != hexId(first) {
+		t.Fatalf("migrated exception: %+v %v", exc, err)
+	}
+
+	lost := mapSpan(shared.LegacySpan{ProjectId: project, Id: uuid.Nil, OwnerId: uuid.Nil, ParentSpanId: uuid.Nil.String(), RecordedAt: at}, ownerIndex{})
+	if !validTraceId(lost.TraceId) || lost.SpanId == "" || lost.ParentSpanId != lost.TraceId {
+		t.Errorf("a span whose nil run is gone still gets valid ids: %+v", lost)
+	}
+	unowned := mapException(shared.LegacyException{ExceptionStackTrace: models.ExceptionStackTrace{ProjectId: project, TraceId: uuid.Nil.String(), TraceType: "endpoint"}}, ownerIndex{})
+	if unowned.TraceId != "" || unowned.TraceType != "" {
+		t.Errorf("an exception whose nil run is gone claims no trace: %+v", unowned)
 	}
 }
 
