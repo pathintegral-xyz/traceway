@@ -40,6 +40,8 @@
 	let webhookMethod = $state('POST');
 	let webhookSecret = $state('');
 	let webhookHeaders = $state<{ key: string; value: string }[]>([]);
+	let feishuWebhookUrl = $state('');
+	let feishuSigningSecret = $state('');
 	let slackWebhookUrl = $state('');
 	let slackChannel = $state('');
 	let slackUsername = $state('');
@@ -68,6 +70,7 @@
 	const channelTypeOptions = [
 		{ value: 'email', label: 'Email' },
 		{ value: 'webhook', label: 'Webhook' },
+		{ value: 'feishu', label: 'Feishu (Webhook)' },
 		{ value: 'slack', label: 'Slack' },
 		{ value: 'github', label: 'GitHub' },
 		{ value: 'pushover', label: 'Pushover' },
@@ -103,6 +106,8 @@
 		webhookMethod = 'POST';
 		webhookSecret = '';
 		webhookHeaders = [];
+		feishuWebhookUrl = '';
+		feishuSigningSecret = '';
 		slackWebhookUrl = '';
 		slackChannel = '';
 		slackUsername = '';
@@ -143,6 +148,9 @@
 						value: value as string
 					}))
 				: [];
+		} else if (ch.channelType === 'feishu') {
+			feishuWebhookUrl = config.webhookUrl || '';
+			feishuSigningSecret = config.signingSecret || '';
 		} else if (ch.channelType === 'slack') {
 			slackWebhookUrl = config.webhookUrl || '';
 			slackChannel = config.channel || '';
@@ -184,6 +192,8 @@
 			}
 			if (Object.keys(headers).length > 0) config.headers = headers;
 			return config;
+		} else if (channelType === 'feishu') {
+			return { webhookUrl: feishuWebhookUrl, signingSecret: feishuSigningSecret };
 		} else if (channelType === 'slack') {
 			const config: NotificationChannelConfig = { webhookUrl: slackWebhookUrl };
 			if (slackChannel) config.channel = slackChannel;
@@ -410,6 +420,25 @@
 						<Plus class="mr-1 h-3 w-3" /> Add Header
 					</Button>
 				</div>
+			{:else if channelType === 'feishu'}
+				<div class="space-y-2">
+					<Label for="feishu-url">Bot Webhook URL</Label>
+					<Input
+						id="feishu-url"
+						type="password"
+						bind:value={feishuWebhookUrl}
+						placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."
+						required
+					/>
+				</div>
+				<div class="space-y-2">
+					<Label for="feishu-secret">Signing Secret</Label>
+					<Input id="feishu-secret" type="password" bind:value={feishuSigningSecret} required />
+				</div>
+				<p class="text-sm text-muted-foreground">
+					Enable signature verification in the Feishu group bot settings, then enter its webhook URL
+					and signing secret here.
+				</p>
 			{:else if channelType === 'slack'}
 				<div class="space-y-2">
 					<Label for="slack-url">Webhook URL</Label>

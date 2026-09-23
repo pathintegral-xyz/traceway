@@ -5,6 +5,7 @@ export type NotificationChannelConfig = {
 	secret?: string;
 	headers?: Record<string, string>;
 	webhookUrl?: string;
+	signingSecret?: string;
 	channel?: string;
 	username?: string;
 	token?: string;
