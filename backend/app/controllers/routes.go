@@ -324,9 +324,6 @@ func RegisterControllers(router *gin.RouterGroup) {
 	// reads main DB + telemetry through its own short transactions).
 	router.GET("/status/:slug", middleware.RateLimitPerIP(30, time.Minute), StatusPageController.Public)
 	router.GET("/status/:slug/logo", middleware.RateLimitPerIP(60, time.Minute), StatusPageController.PublicLogo)
-	// Maps a CNAMEd vanity host to its status page slug (called by the SPA
-	// when an anonymous visitor lands on / of an unrecognized host).
-	router.GET("/status-domains/resolve", middleware.RateLimitPerIP(60, time.Minute), StatusPageController.ResolveHost)
 
 	router.GET("/organizations/:organizationId/teams", middleware.UseAppAuth, middleware.RequireOrganizationAccess, middleware.Transactional, TeamController.List)
 	router.POST("/organizations/:organizationId/teams", middleware.UseAppAuth, middleware.RequireAdminAccess, middleware.Transactional, TeamController.Create)

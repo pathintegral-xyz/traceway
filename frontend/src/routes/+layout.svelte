@@ -26,6 +26,8 @@
 	import { captureException } from '@tracewayapp/frontend';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import type { Component } from 'svelte';
+	import StatusPageView from '$lib/components/traceway/status-page-view.svelte';
+	import { statusDomainSlug } from '$lib/status-domain';
 
 	if (__TRACEWAY_URL__) {
 		setupTraceway({
@@ -98,6 +100,7 @@
 
 	function isPublicPath(pathname: string): boolean {
 		return (
+			statusDomainSlug !== null ||
 			PUBLIC_PATHS.has(pathname) ||
 			pathname.startsWith('/accept-invitation') ||
 			pathname.startsWith('/ack/') ||
@@ -111,28 +114,6 @@
 	$effect(() => {
 		if (!authState.isAuthenticated && !isPublicPath(page.url.pathname)) {
 			const returnTo = page.url.pathname + page.url.search;
-			if (page.url.pathname === '/') {
-				// A CNAMEd status-page vanity domain lands here anonymously; ask
-				// the backend whether this Host maps to a status page before
-				// falling back to the login redirect.
-				fetch('/api/status-domains/resolve')
-					.then((response) => (response.ok ? response.json() : null))
-					.then((resolved) => {
-						if (resolved?.slug) {
-							goto(resolve(`/status/${resolved.slug}` as '/'), { replaceState: true });
-						} else {
-							gotoHref(`/login?returnTo=${encodeURIComponent(returnTo)}`, {
-								replaceState: true
-							});
-						}
-					})
-					.catch(() => {
-						gotoHref(`/login?returnTo=${encodeURIComponent(returnTo)}`, {
-							replaceState: true
-						});
-					});
-				return;
-			}
 			gotoHref(`/login?returnTo=${encodeURIComponent(returnTo)}`, {
 				replaceState: true
 			});
@@ -161,6 +142,7 @@
 
 	$effect(() => {
 		if (
+			statusDomainSlug ||
 			!authState.isAuthenticated ||
 			page.url.pathname !== '/' ||
 			page.url.searchParams.has('projectId') ||
@@ -222,7 +204,7 @@
 		initTheme();
 		window.captureException = captureException;
 
-		if (authState.isAuthenticated) {
+		if (authState.isAuthenticated && !statusDomainSlug) {
 			projectsState.loadProjects();
 		}
 
@@ -316,7 +298,11 @@
 <Tooltip.Provider delayDuration={0}>
 	<!-- This is not ideal, but because our layout is a top level route it can end up showing sidebar on the login page (after the login before the transition). -->
 	<!-- We could consider moving this to a lower level layout for the actual app, for now it's just a path check -->
-	{#if authState.isAuthenticated && !isPublicPath(page.url.pathname) && inSetupFlow}
+	{#if statusDomainSlug}
+		<main class="h-screen w-screen">
+			<StatusPageView slug={statusDomainSlug} />
+		</main>
+	{:else if authState.isAuthenticated && !isPublicPath(page.url.pathname) && inSetupFlow}
 		<div class="flex min-h-screen flex-col">
 			<header class="flex h-14 shrink-0 items-center justify-between px-4">
 				{#if themeState.isDark}
