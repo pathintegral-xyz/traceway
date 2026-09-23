@@ -1,0 +1,10 @@
+[scanner]
+ignore_paths = [
+  "*_test.go",
+  "backend/static/frontend/*",
+  "benchmarks/*",
+  "docker-compose*.yml",
+  "docs/*",
+  "examples/*",
+  "testing/*",
+]
