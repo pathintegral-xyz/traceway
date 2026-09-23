@@ -1,14 +1,9 @@
 # In-repo caller of the reusable auto-fix loop (.github/workflows/autofix.yml).
-# The label gate lives here; the author gate is enforced inside the loop by
-# allowed_authors. workflow_dispatch runs the loop against an existing issue
-# from any branch, which is the only pre-merge validation path for the
-# claude-code-action pin; it runs the agent for real, so point it at a scratch
-# issue.
+# workflow_dispatch runs the loop against an existing issue; the author gate
+# is enforced inside the loop by allowed_authors.
 name: Traceway auto-fix
 
 on:
-  issues:
-    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -18,7 +13,6 @@ on:
 
 jobs:
   fix:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'traceway'
     uses: ./.github/workflows/autofix.yml
     permissions:
       contents: write

@@ -4,25 +4,6 @@ name: Backend Vulncheck
 # traceway-runner artifacts from backend/go.mod, and that binary runs on user
 # infrastructure with an outbound HTTPS long-poll as its main loop.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      # backend/go.mod carries `replace ... /cli => ../cli`, so cli source is
-      # compiled into this scan and a cli-only change can alter the result.
-      - "cli/**"
-      - ".github/workflows/backend-vulncheck.yml"
-  pull_request:
-    types: [labeled]
-    paths:
-      - "backend/**"
-      - "cli/**"
-      - ".github/workflows/backend-vulncheck.yml"
-  # A CVE lands in the database without anyone pushing a commit, and both
-  # triggers above are path-filtered. Off-the-hour to miss GitHub's
-  # on-the-hour scheduler backlog.
-  schedule:
-    - cron: "41 6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -30,7 +11,7 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   # One job per shipped storage backend, because the tags change which drivers
@@ -45,7 +26,6 @@ jobs:
   # both are follow-ups.
   vulncheck:
     name: vulncheck (${{ matrix.name }})
-    if: github.event_name != 'pull_request' || github.event.label.name == 'ci'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:

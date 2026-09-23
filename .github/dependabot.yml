@@ -1,8 +1,7 @@
 version: 2
 
 # Scope: GitHub Actions only. The npm and Go module trees are deliberately left
-# unwatched -- backend/ and cli/ already run govulncheck on a daily schedule, and
-# adding those ecosystems would bury the signal this file exists for. Action
+# unwatched; adding those ecosystems would bury the signal this file exists for. Action
 # versions had no watcher at all, which is how the Node 20 runtime migration
 # (#326) reached us twice in one day as a run annotation instead of a PR.
 updates:
@@ -41,5 +40,4 @@ updates:
           - "*"
         exclude-patterns:
           - "actions/*"
-    # No `labels:` on purpose: `ci` is the collaborator trust gate that makes PR
-    # CI opt-in (see CLAUDE.md), so a reviewer applies it after reading the bump.
+    # The inherited CI workflows are manual-only in this fork (see CLAUDE.md).

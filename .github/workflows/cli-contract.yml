@@ -5,18 +5,6 @@ name: CLI Contract
 # since the point is to catch backend drift the CLI's mock-based unit tests
 # cannot. Equivalent local command: cd cli && just contract-test
 on:
-  push:
-    branches: [main]
-    paths:
-      - "cli/**"
-      - "backend/**"
-      - ".github/workflows/cli-contract.yml"
-  pull_request:
-    types: [labeled]
-    paths:
-      - "cli/**"
-      - "backend/**"
-      - ".github/workflows/cli-contract.yml"
   workflow_dispatch:
 
 permissions:
@@ -24,7 +12,6 @@ permissions:
 
 jobs:
   contract:
-    if: github.event_name != 'pull_request' || github.event.label.name == 'ci'
     runs-on: ubuntu-latest
     defaults:
       run:

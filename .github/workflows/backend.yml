@@ -1,21 +1,6 @@
 name: Backend
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      # backend/go.mod `replace`s the local cli module and app/services/mcpmount
-      # imports cli/pkg/{client,mcpserver}, so a cli-only change can break the
-      # backend build. cli.yml already lists backend/** for the same reason.
-      - "cli/**"
-      - ".github/workflows/backend.yml"
-  pull_request:
-    types: [labeled]
-    paths:
-      - "backend/**"
-      - "cli/**"
-      - ".github/workflows/backend.yml"
   workflow_dispatch:
 
 permissions:
@@ -23,12 +8,11 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   sqlite:
     name: Test (dual SQLite)
-    if: github.event_name != 'pull_request' || github.event.label.name == 'ci'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -109,7 +93,6 @@ jobs:
 
   duckdb:
     name: Test (DuckDB telemetry)
-    if: github.event_name != 'pull_request' || github.event.label.name == 'ci'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -159,7 +142,6 @@ jobs:
 
   pgch:
     name: Test (PostgreSQL + ClickHouse)
-    if: github.event_name != 'pull_request' || github.event.label.name == 'ci'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:

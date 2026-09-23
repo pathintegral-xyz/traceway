@@ -5,18 +5,6 @@ name: Frontend
 # broken build surfaced at release time, where it blocks shipping rather than
 # failing a PR.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "frontend/**"
-      - ".nvmrc"
-      - ".github/workflows/frontend.yml"
-  pull_request:
-    types: [labeled]
-    paths:
-      - "frontend/**"
-      - ".nvmrc"
-      - ".github/workflows/frontend.yml"
   workflow_dispatch:
 
 permissions:
@@ -24,12 +12,11 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   check:
     name: Typecheck, test, build and lint
-    if: github.event_name != 'pull_request' || github.event.label.name == 'ci'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:

@@ -1,20 +1,6 @@
 name: CLI
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "cli/**"
-      - "backend/**"
-      - "skills/traceway/**"
-      - ".github/workflows/cli.yml"
-  pull_request:
-    types: [labeled]
-    paths:
-      - "cli/**"
-      - "backend/**"
-      - "skills/traceway/**"
-      - ".github/workflows/cli.yml"
   workflow_dispatch:
 
 permissions:
@@ -22,7 +8,6 @@ permissions:
 
 jobs:
   build-test:
-    if: github.event_name != 'pull_request' || github.event.label.name == 'ci'
     runs-on: ubuntu-latest
     defaults:
       run:
