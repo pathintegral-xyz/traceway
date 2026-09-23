@@ -41,6 +41,12 @@ func NewAdapter(channelType string, configJSON json.RawMessage) (Adapter, error)
 			return nil, fmt.Errorf("invalid webhook config: %w", err)
 		}
 		return &cfg, nil
+	case "feishu":
+		var cfg FeishuAdapter
+		if err := json.Unmarshal(configJSON, &cfg); err != nil {
+			return nil, fmt.Errorf("invalid Feishu config: %w", err)
+		}
+		return &cfg, nil
 	case "slack":
 		var cfg SlackAdapter
 		if err := json.Unmarshal(configJSON, &cfg); err != nil {
