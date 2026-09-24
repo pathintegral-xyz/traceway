@@ -69,13 +69,19 @@ func TestEnqueueStandaloneD1(t *testing.T) {
 	if !strings.Contains(request.SQL, "notification_outbox") {
 		t.Fatalf("unexpected D1 insert: %q", request.SQL)
 	}
-	configFound := false
+	configFound, messageFound := false, false
 	for _, param := range request.Params {
 		if param == `{"webhookUrl":"https://example.com/bot"}` {
 			configFound = true
 		}
+		if text, ok := param.(string); ok && strings.Contains(text, `"Subject":"test"`) {
+			messageFound = true
+		}
 	}
 	if !configFound {
-		t.Fatalf("D1 insert did not receive JSON adapter config as text: sql=%q params=%#v", request.SQL, request.Params)
+		t.Fatal("D1 insert did not receive JSON adapter config as text")
+	}
+	if !messageFound {
+		t.Fatal("D1 insert did not receive JSON message as text")
 	}
 }

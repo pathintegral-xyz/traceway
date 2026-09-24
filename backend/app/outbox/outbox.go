@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tracewayapp/lit/v2"
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional"
 )
@@ -46,6 +47,27 @@ func Enqueue(tx lit.Executor, d Delivery) (int, error) {
 	cfg := d.AdapterConfig
 	if len(cfg) == 0 {
 		cfg = json.RawMessage("{}")
+	}
+	if db.IsCloudflare() {
+		var pageNotificationID, ruleID, projectID any
+		if d.PageNotificationId != nil {
+			pageNotificationID = *d.PageNotificationId
+		}
+		if d.RuleId != nil {
+			ruleID = *d.RuleId
+		}
+		if d.ProjectId != nil {
+			projectID = d.ProjectId.String()
+		}
+		result, err := tx.Exec(
+			`INSERT INTO notification_outbox (kind, status, adapter_type, adapter_config, message, attempts, next_attempt_at, cancel_key, page_notification_id, rule_id, project_id, channel_name, last_error, created_at) VALUES (?, 'pending', ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, '', ?)`,
+			d.Kind, d.AdapterType, string(cfg), string(messageJSON), next, d.CancelKey, pageNotificationID, ruleID, projectID, d.ChannelName, now,
+		)
+		if err != nil {
+			return 0, err
+		}
+		id, err := result.LastInsertId()
+		return int(id), err
 	}
 	row := &models.OutboxDelivery{
 		Kind:               d.Kind,
