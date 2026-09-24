@@ -6,6 +6,12 @@ package middleware
 // may bypass database/sql transactions. Keeping this registry behind the
 // Cloudflare build tag lets the upstream route declarations remain unchanged.
 func cloudflareTransactionMode(method string, path string) transactionMode {
+	if method == "POST" && (path == "/api/notification-channels" || path == "/api/notification-rules" || path == "/api/notification-rules/:id/toggle" || path == "/api/notification-rules/:id/snooze") {
+		return transactionCommand
+	}
+	if (method == "PUT" || method == "DELETE") && (path == "/api/notification-channels/:id" || path == "/api/notification-rules/:id") {
+		return transactionCommand
+	}
 	switch path {
 	case "/api/login", "/api/register", "/api/projects/batch":
 		return transactionCommand
