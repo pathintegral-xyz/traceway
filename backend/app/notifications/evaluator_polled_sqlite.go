@@ -430,7 +430,7 @@ func evaluateErrorCountThreshold(ctx context.Context, rule *models.NotificationR
 
 	var count int64
 	err := db.TelemetryDB.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM exceptions_v2 WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? AND is_message = 0",
+		"SELECT COUNT(*) FROM exceptions_v2 WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? AND CAST(is_message AS TEXT) IN ('0', 'false')",
 		projectId.String(), from.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano)).Scan(&count)
 	if err != nil {
 		return nil, err
@@ -665,7 +665,7 @@ func computeImpactEndpoints(ctx context.Context, projectId uuid.UUID, minRequest
 		COALESCE(SUM(CASE WHEN e.status_code >= 400 AND e.status_code < 500 THEN 1 ELSE 0 END), 0) as client_error_count
 	FROM endpoints_v2 e
 	LEFT JOIN slow_endpoints s ON e.endpoint = s.endpoint AND e.project_id = s.project_id
-	WHERE e.project_id = ? AND e.recorded_at >= ? AND e.recorded_at <= ? AND e.is_stream = 0
+	WHERE e.project_id = ? AND e.recorded_at >= ? AND e.recorded_at <= ? AND CAST(e.is_stream AS TEXT) IN ('0', 'false')
 	GROUP BY e.endpoint, COALESCE(s.offset_ms, 0)`,
 		pid, fromStr, nowStr)
 	if err != nil {
@@ -708,7 +708,7 @@ func computeImpactEndpoints(ctx context.Context, projectId uuid.UUID, minRequest
 		SELECT endpoint, duration,
 			ROW_NUMBER() OVER (PARTITION BY endpoint ORDER BY duration) AS rn,
 			COUNT(*) OVER (PARTITION BY endpoint) AS cnt
-		FROM endpoints_v2 WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? AND is_stream = 0
+		FROM endpoints_v2 WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? AND CAST(is_stream AS TEXT) IN ('0', 'false')
 	) WHERE rn = CAST(0.99 * (cnt - 1) AS INTEGER) + 1`
 	if db.IsDuckDBTelemetry() {
 		p99Query = `SELECT endpoint, CAST(quantile_cont(duration, 0.99) AS BIGINT) as duration

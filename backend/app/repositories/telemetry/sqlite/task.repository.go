@@ -226,8 +226,8 @@ func (e *taskRepository) FindGroupedByTaskName(ctx context.Context, projectId uu
 	var baseQuery string
 
 	groupedCols := `task_name, COUNT(*) as count, AVG(duration) as avg_duration, MAX(recorded_at) as last_seen,
-			CASE WHEN MAX(is_root) <> 0 THEN 'true' ELSE 'false' END as has_root,
-			CASE WHEN MAX(CASE WHEN is_root = 0 THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as has_non_root`
+			CASE WHEN MAX(CASE WHEN is_root IN (1, 'true') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as has_root,
+			CASE WHEN MAX(CASE WHEN is_root IN (0, 'false') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as has_non_root`
 
 	if needsGoSort {
 		baseQuery = `SELECT ` + groupedCols + `

@@ -7,13 +7,13 @@ import (
 )
 
 // RootFilterClause returns the WHERE fragment for the issues/endpoints
-// root-vs-non-root filter; both embedded backends store is_root as 0/1.
+// root-vs-non-root filter. Older D1 rows may contain TEXT booleans.
 func RootFilterClause(qualifiedCol, rootFilter string) string {
 	switch rootFilter {
 	case "root":
-		return " AND " + qualifiedCol + " = 1"
+		return " AND " + qualifiedCol + " IN (1, 'true')"
 	case "non_root":
-		return " AND " + qualifiedCol + " = 0"
+		return " AND " + qualifiedCol + " IN (0, 'false')"
 	default:
 		return ""
 	}

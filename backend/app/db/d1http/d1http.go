@@ -147,6 +147,17 @@ func (c *conn) CheckNamedValue(value *driver.NamedValue) error {
 	if value.Value == nil {
 		return nil
 	}
+	if b, ok := value.Value.(bool); ok {
+		// D1's HTTP API binds JSON booleans as TEXT ('true'/'false'), even
+		// for INTEGER columns. SQLite predicates compare those to 1/0 and
+		// silently exclude the row. Match database/sql's SQLite convention.
+		if b {
+			value.Value = int64(1)
+		} else {
+			value.Value = int64(0)
+		}
+		return nil
+	}
 	if data, ok := value.Value.([]byte); ok && json.Valid(data) {
 		// D1's HTTP API accepts text parameters, while encoding []byte in JSON
 		// silently turns JSON config into base64 text in the database.

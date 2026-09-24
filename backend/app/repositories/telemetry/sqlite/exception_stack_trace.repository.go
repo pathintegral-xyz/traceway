@@ -170,9 +170,9 @@ func (e *exceptionStackTraceRepository) FindGrouped(ctx context.Context, project
 		params["search"] = search
 	}
 	if searchType == "issues" {
-		whereClause += " AND e.is_message = 0"
+		whereClause += " AND e.is_message IN (0, 'false')"
 	} else if searchType == "messages" {
-		whereClause += " AND e.is_message = 1"
+		whereClause += " AND e.is_message IN (1, 'true')"
 	}
 
 	havingClause := ""
@@ -453,7 +453,7 @@ func (e *exceptionStackTraceRepository) FindByTraceIds(ctx context.Context, trac
 	}
 
 	query := `SELECT id, project_id, trace_id, span_id, trace_type, exception_hash, stack_trace, recorded_at, attributes, app_version, server_name, is_message, session_id
-		FROM exceptions_v2 WHERE ` + traceFilter + ` AND project_id IN (` + strings.Join(placeholders, ",") + `) AND is_message = 0`
+		FROM exceptions_v2 WHERE ` + traceFilter + ` AND project_id IN (` + strings.Join(placeholders, ",") + `) AND is_message IN (0, 'false')`
 	if recordedAt != nil {
 		from, to := shared.DistributedTraceWindowBounds(*recordedAt)
 		query += ` AND recorded_at >= :from AND recorded_at <= :to`
