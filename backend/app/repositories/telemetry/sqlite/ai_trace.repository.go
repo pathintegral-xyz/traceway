@@ -290,8 +290,8 @@ func (r *aiTraceRepository) FindGroupedByTraceName(ctx context.Context, projectI
 			AVG(input_tokens) AS avg_input_tokens,
 			AVG(output_tokens) AS avg_output_tokens,
 			MAX(recorded_at) AS last_seen,
-			CASE WHEN MAX(CASE WHEN is_root IN (1, 'true') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END AS has_root,
-			CASE WHEN MAX(CASE WHEN is_root IN (0, 'false') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END AS has_non_root
+			CASE WHEN MAX(CASE WHEN CAST(is_root AS TEXT) IN ('1', 'true') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END AS has_root,
+			CASE WHEN MAX(CASE WHEN CAST(is_root AS TEXT) IN ('0', 'false') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END AS has_non_root
 		FROM ai_traces_v2 WHERE `+whereClause+`
 		GROUP BY trace_name`, params)
 	if err != nil {
@@ -597,7 +597,7 @@ func (r *aiTraceRepository) FindConversations(ctx context.Context, projectId uui
 
 	havingClause := ""
 	if flaggedOnly {
-		havingClause = " HAVING MAX(CASE WHEN flagged IN (1, 'true') THEN 1 ELSE 0 END) = 1"
+		havingClause = " HAVING MAX(CASE WHEN CAST(flagged AS TEXT) IN ('1', 'true') THEN 1 ELSE 0 END) = 1"
 	}
 
 	rows, err := lit.SelectNamed[conversationStatsRow](db.TelemetryDB,
@@ -609,7 +609,7 @@ func (r *aiTraceRepository) FindConversations(ctx context.Context, projectId uui
 			SUM(tool_call_count) AS tool_call_count,
 			GROUP_CONCAT(DISTINCT tool_names) AS tool_names,
 			GROUP_CONCAT(DISTINCT model) AS models,
-			MAX(CASE WHEN flagged IN (1, 'true') THEN 1 ELSE 0 END) AS flagged,
+			MAX(CASE WHEN CAST(flagged AS TEXT) IN ('1', 'true') THEN 1 ELSE 0 END) AS flagged,
 			GROUP_CONCAT(DISTINCT flagged_terms) AS flagged_terms,
 			MIN(recorded_at) AS first_seen,
 			MAX(recorded_at) AS last_seen
@@ -692,7 +692,7 @@ func (r *aiTraceRepository) FindUserStats(ctx context.Context, projectId uuid.UU
 			COUNT(*) AS turns,
 			SUM(total_cost) AS conv_cost,
 			SUM(total_tokens) AS conv_tokens,
-			MAX(CASE WHEN flagged IN (1, 'true') THEN 1 ELSE 0 END) AS conv_flagged,
+			MAX(CASE WHEN CAST(flagged AS TEXT) IN ('1', 'true') THEN 1 ELSE 0 END) AS conv_flagged,
 			MAX(recorded_at) AS last_seen
 		FROM ai_traces_v2 WHERE `+whereClause+`
 		GROUP BY user_id, conversation_id`, params)

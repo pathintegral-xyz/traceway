@@ -274,9 +274,9 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 		SUM(CASE WHEN e.duration <= (750000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.status_code < 500 THEN 1 ELSE 0 END) as satisfied_count,
 		SUM(CASE WHEN e.duration > (750000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.duration <= (1500000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.status_code < 500 THEN 1 ELSE 0 END) as tolerating_count,
 		SUM(CASE WHEN e.duration > (1500000000 + COALESCE(s.offset_ms, 0) * 1000000) OR e.status_code >= 500 THEN 1 ELSE 0 END) as bad_count,
-		CASE WHEN MAX(CASE WHEN e.is_stream IN (1, 'true') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as is_stream,
-		CASE WHEN MAX(CASE WHEN e.is_root IN (1, 'true') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as has_root,
-		CASE WHEN MAX(CASE WHEN e.is_root IN (0, 'false') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as has_non_root
+		CASE WHEN MAX(CASE WHEN CAST(e.is_stream AS TEXT) IN ('1', 'true') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as is_stream,
+		CASE WHEN MAX(CASE WHEN CAST(e.is_root AS TEXT) IN ('1', 'true') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as has_root,
+		CASE WHEN MAX(CASE WHEN CAST(e.is_root AS TEXT) IN ('0', 'false') THEN 1 ELSE 0 END) <> 0 THEN 'true' ELSE 'false' END as has_non_root
 	FROM endpoints_v2 e
 	LEFT JOIN slow_endpoints s ON e.endpoint = s.endpoint AND e.project_id = s.project_id
 	WHERE ` + whereClause + `
@@ -449,7 +449,7 @@ func (e *endpointRepository) CountByHour(ctx context.Context, projectId uuid.UUI
 func (e *endpointRepository) AvgDurationByHour(ctx context.Context, projectId uuid.UUID, start, end time.Time) ([]models.TimeSeriesPoint, error) {
 	results, err := lit.SelectNamed[sqlitetypes.TimeSeriesResult](db.TelemetryDB,
 		`SELECT strftime('%Y-%m-%d %H:00:00', recorded_at) as bucket, AVG(duration) / 1000000.0 as agg_value
-		FROM endpoints_v2 WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND is_stream IN (0, 'false')
+		FROM endpoints_v2 WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND CAST(is_stream AS TEXT) IN ('0', 'false')
 		GROUP BY bucket ORDER BY bucket ASC`,
 		lit.P{"project_id": projectId, "from": sqlitetypes.NewSQLiteTime(start), "to": sqlitetypes.NewSQLiteTime(end)})
 	if err != nil {
@@ -488,7 +488,7 @@ func (e *endpointRepository) AvgDurationByInterval(ctx context.Context, projectI
 	secs := intervalMinutes * 60
 	results, err := lit.SelectNamed[sqlitetypes.TimeSeriesResult](db.TelemetryDB,
 		fmt.Sprintf(`SELECT datetime((strftime('%%s', recorded_at) / %d) * %d, 'unixepoch') as bucket, AVG(duration) / 1000000.0 as agg_value
-		FROM endpoints_v2 WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND is_stream IN (0, 'false')
+		FROM endpoints_v2 WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND CAST(is_stream AS TEXT) IN ('0', 'false')
 		GROUP BY bucket ORDER BY bucket ASC`, secs, secs),
 		lit.P{"project_id": projectId, "from": sqlitetypes.NewSQLiteTime(start), "to": sqlitetypes.NewSQLiteTime(end)})
 	if err != nil {
@@ -525,10 +525,10 @@ func (e *endpointRepository) FindWorstEndpoints(ctx context.Context, projectId u
 		SUM(CASE WHEN e.duration <= (750000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.status_code < 500 THEN 1 ELSE 0 END) as satisfied_count,
 		SUM(CASE WHEN e.duration > (750000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.duration <= (1500000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.status_code < 500 THEN 1 ELSE 0 END) as tolerating_count,
 		SUM(CASE WHEN e.duration > (1500000000 + COALESCE(s.offset_ms, 0) * 1000000) OR e.status_code >= 500 THEN 1 ELSE 0 END) as bad_count,
-		MAX(CASE WHEN e.is_stream IN (1, 'true') THEN 1 ELSE 0 END) as is_stream
+		MAX(CASE WHEN CAST(e.is_stream AS TEXT) IN ('1', 'true') THEN 1 ELSE 0 END) as is_stream
 	FROM endpoints_v2 e
 	LEFT JOIN slow_endpoints s ON e.endpoint = s.endpoint AND e.project_id = s.project_id
-	WHERE e.project_id = :project_id AND e.recorded_at >= :from AND e.recorded_at <= :to AND e.is_stream IN (0, 'false')
+	WHERE e.project_id = :project_id AND e.recorded_at >= :from AND e.recorded_at <= :to AND CAST(e.is_stream AS TEXT) IN ('0', 'false')
 	GROUP BY e.endpoint`
 
 	parsedQuery, args, err := lit.ParseNamedQuery(db.Driver, groupQuery, params)
@@ -618,7 +618,7 @@ func (e *endpointRepository) GetEndpointStats(ctx context.Context, projectId uui
 	}
 
 	isStreamRow, err := lit.SelectSingleNamed[isStreamFlagRow](db.TelemetryDB,
-		`SELECT COALESCE(MAX(CASE WHEN is_stream IN (1, 'true') THEN 1 ELSE 0 END), 0) as is_stream FROM endpoints_v2 WHERE project_id = :project_id AND endpoint = :endpoint AND recorded_at >= :from AND recorded_at <= :to`,
+		`SELECT COALESCE(MAX(CASE WHEN CAST(is_stream AS TEXT) IN ('1', 'true') THEN 1 ELSE 0 END), 0) as is_stream FROM endpoints_v2 WHERE project_id = :project_id AND endpoint = :endpoint AND recorded_at >= :from AND recorded_at <= :to`,
 		params)
 	if err != nil {
 		return nil, err
@@ -695,7 +695,7 @@ func (e *endpointRepository) GetEndpointStackedChart(ctx context.Context, projec
 		%s as endpoint_category,
 		%s as metric_value
 	FROM endpoints_v2
-	WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND is_stream IN (0, 'false')%s
+	WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND CAST(is_stream AS TEXT) IN ('0', 'false')%s
 	GROUP BY bucket, endpoint_category
 	ORDER BY bucket ASC, endpoint_category ASC`, secs, secs, caseExpr, metricExpr, filterClause)
 
@@ -760,7 +760,7 @@ func (e *endpointRepository) getStackedChartWithPercentiles(ctx context.Context,
 		endpoint,
 		duration
 	FROM endpoints_v2
-	WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND is_stream IN (0, 'false')%s
+	WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND CAST(is_stream AS TEXT) IN ('0', 'false')%s
 	ORDER BY bucket ASC, endpoint ASC, duration ASC`, bucketSecs, bucketSecs, filterClause)
 
 	parsedQuery, args, err := lit.ParseNamedQuery(db.Driver, query, params)
@@ -864,7 +864,7 @@ func fetchSortedDurations(ctx context.Context, projectId uuid.UUID, endpoint str
 	filterClause := endpointFilterClause(params, "", search, rootFilter, methodFilter)
 
 	results, err := lit.SelectNamed[endpointDurationRow](db.TelemetryDB,
-		"SELECT duration FROM endpoints_v2 WHERE project_id = :project_id AND endpoint = :endpoint AND recorded_at >= :from AND recorded_at <= :to AND is_stream IN (0, 'false')"+filterClause+" ORDER BY duration ASC",
+		"SELECT duration FROM endpoints_v2 WHERE project_id = :project_id AND endpoint = :endpoint AND recorded_at >= :from AND recorded_at <= :to AND CAST(is_stream AS TEXT) IN ('0', 'false')"+filterClause+" ORDER BY duration ASC",
 		params)
 	if err != nil {
 		return nil, err
@@ -909,7 +909,7 @@ func getTopEndpointsByMetric(ctx context.Context, projectId uuid.UUID, from, to 
 	if metricType == "total_time" {
 		results, err := lit.SelectNamed[endpointMetricRow](db.TelemetryDB,
 			`SELECT endpoint, COUNT(*) * AVG(duration) / 1000000.0 as metric_value
-			FROM endpoints_v2 WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND is_stream IN (0, 'false')`+filterClause+`
+			FROM endpoints_v2 WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND CAST(is_stream AS TEXT) IN ('0', 'false')`+filterClause+`
 			GROUP BY endpoint ORDER BY metric_value DESC LIMIT 5`,
 			params)
 		if err != nil {
@@ -932,7 +932,7 @@ func getTopEndpointsByMetric(ctx context.Context, projectId uuid.UUID, from, to 
 	}
 
 	epRows, err := lit.SelectNamed[distinctEndpointRow](db.TelemetryDB,
-		`SELECT DISTINCT endpoint FROM endpoints_v2 WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND is_stream IN (0, 'false')`+filterClause,
+		`SELECT DISTINCT endpoint FROM endpoints_v2 WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to AND CAST(is_stream AS TEXT) IN ('0', 'false')`+filterClause,
 		params)
 	if err != nil {
 		return nil, err

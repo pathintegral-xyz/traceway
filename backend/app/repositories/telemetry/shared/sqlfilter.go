@@ -11,9 +11,9 @@ import (
 func RootFilterClause(qualifiedCol, rootFilter string) string {
 	switch rootFilter {
 	case "root":
-		return " AND " + qualifiedCol + " IN (1, 'true')"
+		return " AND CAST(" + qualifiedCol + " AS TEXT) IN ('1', 'true')"
 	case "non_root":
-		return " AND " + qualifiedCol + " IN (0, 'false')"
+		return " AND CAST(" + qualifiedCol + " AS TEXT) IN ('0', 'false')"
 	default:
 		return ""
 	}
