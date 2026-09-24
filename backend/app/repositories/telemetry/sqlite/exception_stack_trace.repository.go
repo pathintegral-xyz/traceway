@@ -116,7 +116,7 @@ func (e *exceptionStackTraceRepository) InsertAsync(ctx context.Context, lines [
 		for _, est := range lines {
 			row := exceptionToRow(est)
 			statements = append(statements, d1http.Statement{
-				SQL: "INSERT INTO exception_stack_traces (id, project_id, trace_id, trace_type, exception_hash, stack_trace, recorded_at, attributes, app_version, server_name, is_message, distributed_trace_id, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				SQL:    "INSERT INTO exception_stack_traces (id, project_id, trace_id, trace_type, exception_hash, stack_trace, recorded_at, attributes, app_version, server_name, is_message, distributed_trace_id, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 				Params: []any{row.Id, row.ProjectId, row.TraceId, row.TraceType, row.ExceptionHash, row.StackTrace, row.RecordedAt, row.Attributes, row.AppVersion, row.ServerName, row.IsMessage, row.DistributedTraceId, row.SessionId},
 			})
 		}
@@ -174,9 +174,9 @@ func (e *exceptionStackTraceRepository) FindGrouped(ctx context.Context, project
 		params["search"] = search
 	}
 	if searchType == "issues" {
-		whereClause += " AND e.is_message = 0"
+		whereClause += " AND e.is_message IN (0, 'false')"
 	} else if searchType == "messages" {
-		whereClause += " AND e.is_message = 1"
+		whereClause += " AND e.is_message IN (1, 'true')"
 	}
 
 	havingClause := ""
@@ -399,7 +399,7 @@ func (e *exceptionStackTraceRepository) IsArchived(ctx context.Context, projectI
 func (e *exceptionStackTraceRepository) FindExceptionByTraceId(ctx context.Context, projectId uuid.UUID, traceId uuid.UUID) (*models.ExceptionStackTrace, error) {
 	row, err := lit.SelectSingleNamed[exceptionRow](db.TelemetryDB,
 		`SELECT id, project_id, trace_id, trace_type, exception_hash, stack_trace, recorded_at, attributes, app_version, server_name, is_message, distributed_trace_id, session_id
-		FROM exception_stack_traces WHERE project_id = :project_id AND trace_id = :trace_id AND is_message = 0 LIMIT 1`,
+		FROM exception_stack_traces WHERE project_id = :project_id AND trace_id = :trace_id AND is_message IN (0, 'false') LIMIT 1`,
 		lit.P{"project_id": projectId, "trace_id": traceId})
 	if err != nil {
 		return nil, err
@@ -471,7 +471,7 @@ func (e *exceptionStackTraceRepository) FindByDistributedTraceId(ctx context.Con
 	}
 
 	query := `SELECT id, project_id, trace_id, trace_type, exception_hash, stack_trace, recorded_at, attributes, app_version, server_name, is_message, distributed_trace_id, session_id
-		FROM exception_stack_traces WHERE distributed_trace_id = :trace_id AND project_id IN (` + strings.Join(placeholders, ",") + `) AND is_message = 0`
+		FROM exception_stack_traces WHERE distributed_trace_id = :trace_id AND project_id IN (` + strings.Join(placeholders, ",") + `) AND is_message IN (0, 'false')`
 	if recordedAt != nil {
 		from, to := shared.DistributedTraceWindowBounds(*recordedAt)
 		query += ` AND recorded_at >= :from AND recorded_at <= :to`

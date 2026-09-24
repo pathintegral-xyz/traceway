@@ -107,6 +107,52 @@ func TestExecSendsJSONBytesAsText(t *testing.T) {
 	}
 }
 
+func TestBooleanParametersUseSQLiteIntegers(t *testing.T) {
+	db := newTestDB(t, func(w http.ResponseWriter, r *http.Request) {
+		var request queryRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if len(request.Params) != 2 || request.Params[0] != float64(1) || request.Params[1] != float64(0) {
+			t.Fatalf("boolean parameters = %#v", request.Params)
+		}
+		response(w, map[string]any{
+			"success": true,
+			"meta":    map[string]any{"changes": 1, "last_row_id": "1"},
+			"results": map[string]any{"columns": []string{}, "rows": [][]any{}},
+		})
+	})
+	if _, err := db.Exec("INSERT INTO notification_rules (enabled, archived) VALUES (?, ?)", true, false); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBatchBooleanParametersUseSQLiteIntegers(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request batchRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if len(request.Batch) != 1 || len(request.Batch[0].Params) != 2 ||
+			request.Batch[0].Params[0] != float64(1) || request.Batch[0].Params[1] != float64(0) {
+			t.Fatalf("batch boolean parameters = %#v", request.Batch)
+		}
+		response(w, map[string]any{
+			"success": true,
+			"meta":    map[string]any{"changes": 1, "last_row_id": "1"},
+			"results": map[string]any{"columns": []string{}, "rows": [][]any{}},
+		})
+	}))
+	defer server.Close()
+	connector, err := NewConnector(Config{AccountID: "account", DatabaseID: "database", APIToken: "token", Endpoint: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := connector.Batch(context.Background(), []Statement{{SQL: "INSERT INTO flags VALUES (?, ?)", Params: []any{true, false}}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestScanLegacyBase64Config(t *testing.T) {
 	db := newTestDB(t, func(w http.ResponseWriter, r *http.Request) {
 		response(w, map[string]any{
