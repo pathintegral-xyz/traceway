@@ -86,6 +86,67 @@ func TestExecExposesD1MetadataAndFormatsTime(t *testing.T) {
 	}
 }
 
+func TestExecSendsJSONBytesAsText(t *testing.T) {
+	db := newTestDB(t, func(w http.ResponseWriter, r *http.Request) {
+		var request queryRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if got := request.Params[0]; got != `{"recipients":["test@example.com"]}` {
+			t.Fatalf("JSON parameter = %#v", got)
+		}
+		response(w, map[string]any{
+			"success": true,
+			"meta":    map[string]any{"changes": 1, "last_row_id": "1"},
+			"results": map[string]any{"columns": []string{}, "rows": [][]any{}},
+		})
+	})
+
+	if _, err := db.Exec("INSERT INTO notification_channels (config) VALUES (?)", []byte(`{"recipients":["test@example.com"]}`)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestScanLegacyBase64Config(t *testing.T) {
+	db := newTestDB(t, func(w http.ResponseWriter, r *http.Request) {
+		response(w, map[string]any{
+			"success": true,
+			"meta":    map[string]any{"changes": 0, "last_row_id": "0"},
+			"results": map[string]any{
+				"columns": []string{"config"},
+				"rows":    [][]any{{"eyJyZWNpcGllbnRzIjpbInRlc3RAZXhhbXBsZS5jb20iXX0="}},
+			},
+		})
+	})
+	var config json.RawMessage
+	if err := db.QueryRow("SELECT config FROM notification_channels").Scan(&config); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := json.Marshal(config); err != nil || string(got) != `{"recipients":["test@example.com"]}` {
+		t.Fatalf("legacy base64 config marshalled as %s, error %v", got, err)
+	}
+}
+
+func TestScanJSONConfig(t *testing.T) {
+	db := newTestDB(t, func(w http.ResponseWriter, r *http.Request) {
+		response(w, map[string]any{
+			"success": true,
+			"meta":    map[string]any{"changes": 0, "last_row_id": "0"},
+			"results": map[string]any{
+				"columns": []string{"config"},
+				"rows":    [][]any{{`{"recipients":["test@example.com"]}`}},
+			},
+		})
+	})
+	var config json.RawMessage
+	if err := db.QueryRow("SELECT config FROM notification_channels").Scan(&config); err != nil {
+		t.Fatal(err)
+	}
+	if string(config) != `{"recipients":["test@example.com"]}` {
+		t.Fatalf("config = %s", config)
+	}
+}
+
 func TestTransactionIsExplicitlyRejected(t *testing.T) {
 	db := newTestDB(t, func(http.ResponseWriter, *http.Request) { t.Fatal("request should not be made") })
 	_, err := db.BeginTx(context.Background(), nil)

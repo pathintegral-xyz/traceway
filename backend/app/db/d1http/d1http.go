@@ -10,6 +10,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -144,6 +145,12 @@ func (c *conn) PrepareContext(_ context.Context, query string) (driver.Stmt, err
 
 func (c *conn) CheckNamedValue(value *driver.NamedValue) error {
 	if value.Value == nil {
+		return nil
+	}
+	if data, ok := value.Value.([]byte); ok && json.Valid(data) {
+		// D1's HTTP API accepts text parameters, while encoding []byte in JSON
+		// silently turns JSON config into base64 text in the database.
+		value.Value = string(data)
 		return nil
 	}
 	if t, ok := value.Value.(time.Time); ok {
@@ -324,6 +331,16 @@ func toDriverValue(value any, column string) (driver.Value, error) {
 	case nil:
 		return nil, nil
 	case string:
+		if column == "config" {
+			if !json.Valid([]byte(typed)) {
+				if decoded, err := base64.StdEncoding.DecodeString(typed); err == nil && json.Valid(decoded) {
+					// Older D1 writes marshalled []byte config as base64 text.
+					return decoded, nil
+				}
+			}
+			// database/sql cannot scan a string into json.RawMessage.
+			return []byte(typed), nil
+		}
 		// D1's raw API may encode SQLite boolean expressions (for example
 		// MAX(is_root)) as the strings "true" and "false". Normalize those
 		// values before database/sql scans them into bool fields.
