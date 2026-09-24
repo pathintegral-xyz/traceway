@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/db/d1http"
 	"github.com/tracewayapp/traceway/backend/app/models"
 )
 
@@ -220,6 +221,25 @@ type aiTraceRepository struct{}
 func (r *aiTraceRepository) InsertAsync(ctx context.Context, lines []models.AiTrace) error {
 	if len(lines) == 0 {
 		return nil
+	}
+	if db.IsCloudflare() {
+		const columns = "id, project_id, recorded_at, duration, status_code, model, response_model, provider, operation, input_tokens, output_tokens, total_tokens, cached_tokens, reasoning_tokens, input_cost, output_cost, total_cost, trace_name, user_id, finish_reason, server_name, app_version, storage_key, attributes, trace_id, span_id, parent_span_id, is_root, conversation_id, tool_call_count, tool_names, flagged, flagged_terms"
+		statements := make([]d1http.Statement, 0, len(lines))
+		for _, t := range lines {
+			row := aiTraceToRow(t)
+			params := []any{
+				row.Id, row.ProjectId, row.RecordedAt, row.Duration, row.StatusCode, row.Model,
+				row.ResponseModel, row.Provider, row.Operation, row.InputTokens, row.OutputTokens,
+				row.TotalTokens, row.CachedTokens, row.ReasoningTokens, row.InputCost, row.OutputCost,
+				row.TotalCost, row.TraceName, row.UserId, row.FinishReason, row.ServerName,
+				row.AppVersion, row.StorageKey, row.Attributes, row.TraceId, row.SpanId,
+				row.ParentSpanId, row.IsRoot, row.ConversationId, row.ToolCallCount,
+				row.ToolNames, row.Flagged, row.FlaggedTerms,
+			}
+			query := "INSERT INTO ai_traces_v2 (" + columns + ") VALUES (" + strings.TrimSuffix(strings.Repeat("?,", len(params)), ",") + ")"
+			statements = append(statements, d1http.Statement{SQL: query, Params: params})
+		}
+		return db.BatchTelemetry(ctx, statements)
 	}
 
 	tx, err := db.TelemetryDB.BeginTx(ctx, nil)

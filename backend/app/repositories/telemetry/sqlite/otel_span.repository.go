@@ -5,8 +5,10 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -59,7 +61,10 @@ func (r *otelSpanRepository) InsertWithRejections(ctx context.Context, spans []m
 				rejected = append(rejected, shared.SpanOwner{ProjectId: span.ProjectId, TraceId: span.TraceId, SpanId: span.SpanId})
 				continue
 			}
-			statements = append(statements, d1http.Statement{SQL: shared.OtelTextInsertSQL, Params: values})
+			// D1's JSON query API base64-encodes []byte parameters, so write the OTLP payload as a SQLite BLOB literal.
+			payload := values[len(values)-1].([]byte)
+			statement := strings.TrimSuffix(shared.OtelTextInsertSQL, "?)") + "X'" + hex.EncodeToString(payload) + "')"
+			statements = append(statements, d1http.Statement{SQL: statement, Params: values[:len(values)-1]})
 		}
 		if err := db.BatchTelemetry(ctx, statements); err != nil {
 			return nil, err
@@ -212,12 +217,19 @@ func (r *otelSpanRepository) FindOTLP(ctx context.Context, project uuid.UUID, tr
 	defer cancel()
 	var value []byte
 	from, to := shared.TraceWindowBounds(at.UTC())
-	err := db.TelemetryDB.QueryRowContext(ctx, "SELECT otlp FROM "+shared.SpansTable+" WHERE project_id = ? AND trace_id = ? AND span_id = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY "+shared.OtelTextWinnerOrder+" LIMIT 1", project.String(), traceID, spanID, sqliteOtelCodec.Time(from), sqliteOtelCodec.Time(to)).Scan(&value)
+	column := "otlp"
+	if db.IsCloudflare() {
+		column = "hex(otlp)"
+	}
+	err := db.TelemetryDB.QueryRowContext(ctx, "SELECT "+column+" FROM "+shared.SpansTable+" WHERE project_id = ? AND trace_id = ? AND span_id = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY "+shared.OtelTextWinnerOrder+" LIMIT 1", project.String(), traceID, spanID, sqliteOtelCodec.Time(from), sqliteOtelCodec.Time(to)).Scan(&value)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if db.IsCloudflare() {
+		return hex.DecodeString(string(value))
 	}
 	return value, nil
 }

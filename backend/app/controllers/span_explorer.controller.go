@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"math"
@@ -180,9 +179,7 @@ func (s spanExplorerController) Search(c *gin.Context) {
 // Services of one trace usually report to different projects, and membership of the organization is what grants
 // read access to each of them. Other organizations of the same user stay out.
 func organizationProjects(c *gin.Context, projectId uuid.UUID) ([]*models.Project, error) {
-	projects, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
-		return transactional.ProjectRepository.FindByUserId(tx, middleware.GetUserId(c))
-	})
+	projects, err := transactional.ProjectRepository.FindByUserId(db.MainExecutor(c), middleware.GetUserId(c))
 	if err != nil {
 		return nil, err
 	}

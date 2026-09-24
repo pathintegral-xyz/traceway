@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/config"
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/repositories/telemetry"
 	traceway "go.tracewayapp.com"
 )
@@ -21,6 +22,10 @@ func startMoveOver(ctx context.Context, telemetryRetentionDays int) {
 	cfg := config.Config
 	enabled, err := strconv.ParseBool(strings.TrimSpace(cfg.V2MoveOver))
 	if err != nil || !enabled {
+		return
+	}
+	if db.IsCloudflare() {
+		log.Printf("[tracewaybackend] move-over: V2_MOVE_OVER is unavailable with Cloudflare D1")
 		return
 	}
 	options := telemetry.MoveOverOptions{Workers: parseMoveOverWorkers(cfg.V2MoveOverWorkers)}
