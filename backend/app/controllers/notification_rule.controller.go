@@ -108,7 +108,7 @@ func (ctrl *notificationRuleController) Create(ctx *gin.Context) {
 		req.CooldownMinutes = 15
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	channel, err := transactional.NotificationChannelRepository.FindById(tx, req.ChannelId)
 	if err != nil {
@@ -193,7 +193,7 @@ func (ctrl *notificationRuleController) Update(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 
 	existing, err := transactional.NotificationRuleRepository.FindById(tx, id)
 	if err != nil {
@@ -251,7 +251,7 @@ func (ctrl *notificationRuleController) Delete(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	existing, err := transactional.NotificationRuleRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to delete notification rule: %w", err))
@@ -285,7 +285,7 @@ func (ctrl *notificationRuleController) Toggle(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	existing, err := transactional.NotificationRuleRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find notification rule: %w", err))
@@ -330,7 +330,7 @@ func (ctrl *notificationRuleController) Snooze(ctx *gin.Context) {
 		return
 	}
 
-	tx := db.GetTx(ctx)
+	tx := db.MainExecutor(ctx)
 	existing, err := transactional.NotificationRuleRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find notification rule: %w", err))
