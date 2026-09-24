@@ -264,7 +264,12 @@ func (c *Connector) request(ctx context.Context, bodyValue any) (apiResponse, er
 		return apiResponse{}, fmt.Errorf("d1http: read response: %w", err)
 	}
 	var payload apiResponse
-	if err := json.Unmarshal(data, &payload); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	// Preserve D1 INTEGER values as json.Number. Decoding through float64
+	// prevents database/sql from scanning 0/1 into bool and loses precision
+	// for IDs above 2^53.
+	decoder.UseNumber()
+	if err := decoder.Decode(&payload); err != nil {
 		return apiResponse{}, fmt.Errorf("d1http: decode response: %w", err)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 || !payload.Success {
