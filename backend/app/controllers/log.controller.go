@@ -1,18 +1,18 @@
 package controllers
 
 import (
-	"context"
-	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
 
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories/telemetry"
+	"github.com/tracewayapp/traceway/backend/app/repositories/telemetry/shared"
 )
 
 type logController struct{}
@@ -33,22 +33,21 @@ type LogPaginationParams struct {
 }
 
 type LogSearchRequest struct {
-	FromDate           time.Time                   `json:"fromDate"`
-	ToDate             time.Time                   `json:"toDate"`
-	OrderBy            string                      `json:"orderBy"`
-	SortDirection      string                      `json:"sortDirection"`
-	Search             string                      `json:"search"`
-	SearchType         string                      `json:"searchType"`
-	MinSeverity        uint8                       `json:"minSeverity"`
-	ServiceName        string                      `json:"serviceName"`
-	TraceId            string                      `json:"traceId"`
-	SpanId             string                      `json:"spanId"`
-	ScopeName          string                      `json:"scopeName"`
-	Body               string                      `json:"body"`
-	DistributedTraceId string                      `json:"distributedTraceId"`
-	ExcludeTraceId     string                      `json:"excludeTraceId"`
-	AttributeFilters   []LogAttributeFilterRequest `json:"attributeFilters"`
-	Pagination         LogPaginationParams         `json:"pagination"`
+	FromDate         time.Time                   `json:"fromDate"`
+	ToDate           time.Time                   `json:"toDate"`
+	OrderBy          string                      `json:"orderBy"`
+	SortDirection    string                      `json:"sortDirection"`
+	Search           string                      `json:"search"`
+	SearchType       string                      `json:"searchType"`
+	MinSeverity      uint8                       `json:"minSeverity"`
+	ServiceName      string                      `json:"serviceName"`
+	TraceId          string                      `json:"traceId"`
+	WholeTrace       bool                        `json:"wholeTrace"`
+	SpanId           string                      `json:"spanId"`
+	ScopeName        string                      `json:"scopeName"`
+	Body             string                      `json:"body"`
+	AttributeFilters []LogAttributeFilterRequest `json:"attributeFilters"`
+	Pagination       LogPaginationParams         `json:"pagination"`
 }
 
 // Max time range allowed for body search without any other selector. Keeps a
@@ -71,6 +70,14 @@ func (l logController) List(c *gin.Context) {
 		return
 	}
 
+	if request.TraceId != "" {
+		request.TraceId = shared.NormalizeTraceId(request.TraceId)
+		if !validTraceHex(request.TraceId) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid traceId"})
+			return
+		}
+	}
+
 	// Loki-style gate: a body substring search without any selector can scan
 	// the entire body column across the requested range. Require at least one
 	// selector (service / severity / trace / attribute) OR a short time range.
@@ -85,7 +92,6 @@ func (l logController) List(c *gin.Context) {
 			request.SpanId != "" ||
 			request.ScopeName != "" ||
 			request.Body != "" ||
-			request.DistributedTraceId != "" ||
 			len(request.AttributeFilters) > 0
 		rangeTooWide := request.ToDate.Sub(request.FromDate) > bodySearchUnscopedMaxRange
 		if !hasSelector && rangeTooWide {
@@ -128,32 +134,19 @@ func (l logController) List(c *gin.Context) {
 		Page:             request.Pagination.Page,
 		PageSize:         request.Pagination.PageSize,
 	}
-
-	if request.DistributedTraceId != "" {
-		dtid, err := uuid.Parse(request.DistributedTraceId)
+	if request.WholeTrace && request.TraceId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "wholeTrace requires a traceId"})
+		return
+	}
+	if request.WholeTrace {
+		projects, err := organizationProjects(c, projectId)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid distributedTraceId"})
+			c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("error listing trace projects: %w", err))
 			return
 		}
-		traceIds, err := l.resolveDistributedTraceIds(c, dtid, projectId, request.ExcludeTraceId, request.FromDate)
-		if err != nil {
-			c.AbortWithError(500, traceway.NewStackTraceErrorf("error resolving distributed trace: %w", err))
-			return
+		for _, project := range projects {
+			params.ProjectIds = append(params.ProjectIds, project.Id)
 		}
-		if len(traceIds) == 0 {
-			c.JSON(http.StatusOK, PaginatedResponse[models.LogRecord]{
-				Data: []models.LogRecord{},
-				Pagination: Pagination{
-					Page:       request.Pagination.Page,
-					PageSize:   request.Pagination.PageSize,
-					Total:      0,
-					TotalPages: 0,
-				},
-			})
-			return
-		}
-		params.TraceIds = traceIds
-		params.TraceId = ""
 	}
 
 	span := traceway.StartSpan(c, "loading logs")
@@ -175,48 +168,16 @@ func (l logController) List(c *gin.Context) {
 	})
 }
 
-func (l logController) resolveDistributedTraceIds(ctx context.Context, dtid uuid.UUID, projectId uuid.UUID, excludeTraceHex string, recordedAt time.Time) ([]string, error) {
-	projectIds := []uuid.UUID{projectId}
-
-	var recordedAtHint *time.Time
-	if !recordedAt.IsZero() {
-		recordedAtHint = &recordedAt
+func (r *LogSearchRequest) UnmarshalJSON(data []byte) error {
+	type request LogSearchRequest
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
 	}
-
-	endpoints, err := telemetry.EndpointRepository.FindByDistributedTraceId(ctx, dtid, projectIds, recordedAtHint)
-	if err != nil {
-		return nil, err
-	}
-	tasks, err := telemetry.TaskRepository.FindByDistributedTraceId(ctx, dtid, projectIds, recordedAtHint)
-	if err != nil {
-		return nil, err
-	}
-	aiTraces, err := telemetry.AiTraceRepository.FindByDistributedTraceId(ctx, dtid, projectIds, recordedAtHint)
-	if err != nil {
-		return nil, err
-	}
-
-	seen := make(map[string]struct{}, len(endpoints)+len(tasks)+len(aiTraces))
-	result := make([]string, 0, len(endpoints)+len(tasks)+len(aiTraces))
-	add := func(id uuid.UUID) {
-		h := hex.EncodeToString(id[:])
-		if _, ok := seen[h]; ok {
-			return
+	for _, key := range []string{"distributedTraceId", "excludeTraceId"} {
+		if _, exists := fields[key]; exists {
+			return fmt.Errorf("%s is no longer supported; use traceId to select one trace", key)
 		}
-		if h == excludeTraceHex {
-			return
-		}
-		seen[h] = struct{}{}
-		result = append(result, h)
 	}
-	for _, ep := range endpoints {
-		add(ep.Id)
-	}
-	for _, t := range tasks {
-		add(t.Id)
-	}
-	for _, a := range aiTraces {
-		add(a.Id)
-	}
-	return result, nil
+	return json.Unmarshal(data, (*request)(r))
 }

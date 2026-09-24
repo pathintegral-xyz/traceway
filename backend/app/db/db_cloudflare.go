@@ -6,10 +6,10 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/config"
 	"github.com/tracewayapp/traceway/backend/app/db/d1http"
-	"github.com/google/uuid"
 )
 
 // MainD1 and TelemetryD1 expose D1's explicit batch operation to the small

@@ -53,6 +53,10 @@ type Cfg struct {
 	ProfileArchiveRaw    string
 	ProfileRetentionDays string
 
+	V2MoveOver        string
+	V2MoveOverOldest  string
+	V2MoveOverWorkers string
+
 	SourceMapCacheMaxEntries string
 	SourceMapCacheMaxBytesMB string
 	SourceMapCacheType       string
@@ -251,6 +255,10 @@ func LoadFromEnv() *Cfg {
 
 		ProfileArchiveRaw:    os.Getenv("PROFILE_ARCHIVE_RAW"),
 		ProfileRetentionDays: os.Getenv("PROFILE_RETENTION_DAYS"),
+
+		V2MoveOver:        os.Getenv("V2_MOVE_OVER"),
+		V2MoveOverOldest:  os.Getenv("V2_MOVE_OVER_OLDEST"),
+		V2MoveOverWorkers: os.Getenv("V2_MOVE_OVER_WORKERS"),
 
 		SourceMapCacheMaxEntries: os.Getenv("SOURCEMAP_CACHE_MAX_ENTRIES"),
 		SourceMapCacheMaxBytesMB: os.Getenv("SOURCEMAP_CACHE_MAX_BYTES_MB"),

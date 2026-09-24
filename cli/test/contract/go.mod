@@ -9,6 +9,8 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/tracewayapp/traceway/backend v0.0.0
 	github.com/tracewayapp/traceway/cli v1.9.15
+	go.opentelemetry.io/proto/otlp v1.10.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
@@ -115,7 +117,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
-	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.opentelemetry.io/proto/otlp/collector/profiles/v1development v0.3.0 // indirect
 	go.opentelemetry.io/proto/otlp/profiles/v1development v0.3.0 // indirect
 	go.tracewayapp.com v1.0.4 // indirect
@@ -133,10 +134,9 @@ require (
 	golang.org/x/text v0.39.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
-	google.golang.org/grpc v1.82.1 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	google.golang.org/grpc v1.83.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.41.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
