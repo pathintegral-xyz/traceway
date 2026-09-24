@@ -116,6 +116,12 @@ func (e clientController) Report(c *gin.Context) {
 		return
 	}
 	parseSpan.End()
+	for _, frame := range request.CollectionFrames {
+		if err := frame.Validate(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
 
 	bodyBytes := 0
 	if cb, ok := c.Get(gin.BodyBytesKey); ok {
@@ -154,6 +160,9 @@ func (e clientController) Report(c *gin.Context) {
 		}
 
 		for _, ct := range cf.Traces {
+			if ct == nil {
+				continue
+			}
 			if ct.IsTask {
 				t := ct.ToTask(request.AppVersion, request.ServerName)
 				t.ProjectId = projectId
@@ -167,10 +176,11 @@ func (e clientController) Report(c *gin.Context) {
 				endpointsToInsert = append(endpointsToInsert, e)
 			}
 
+			spansToInsert = append(spansToInsert, ct.RootSpan(projectId, request.ServerName))
 			for _, cs := range ct.Spans {
-				span := cs.ToSpan(ct.ParsedId())
-				span.ProjectId = projectId
-				spansToInsert = append(spansToInsert, span)
+				if cs != nil {
+					spansToInsert = append(spansToInsert, cs.ToSpan(ct, projectId, request.ServerName))
+				}
 			}
 		}
 		resolveJs := project != nil && project.SourceMapToken != nil && jsFrameworks[project.Framework]
@@ -261,10 +271,13 @@ func (e clientController) Report(c *gin.Context) {
 	}
 	convertSpan.End()
 
-	var droppedHealthchecks int
-	endpointsToInsert, spansToInsert, droppedHealthchecks = services.FilterHealthchecks(project, endpointsToInsert, spansToInsert, exceptionStackTraceToInsert)
-	if droppedHealthchecks > 0 {
-		monitoring.RecordHealthchecksDropped(monitoring.SignalNative, droppedHealthchecks)
+	var droppedHealthchecks map[string]bool
+	endpointsToInsert, droppedHealthchecks = services.FilterHealthchecks(project, endpointsToInsert, exceptionStackTraceToInsert)
+	spansToInsert = services.DropSpanSubtrees(spansToInsert, func(span models.Span) (string, string, string) {
+		return span.TraceId, span.SpanId, span.ParentSpanId
+	}, droppedHealthchecks, nil)
+	if len(droppedHealthchecks) > 0 {
+		monitoring.RecordHealthchecksDropped(monitoring.SignalNative, len(droppedHealthchecks))
 	}
 
 	perm := hooks.IngestPermission{Exceptions: true, Data: true, Replay: true}
@@ -299,6 +312,15 @@ func (e clientController) Report(c *gin.Context) {
 
 	convertMs := float64(time.Since(convertStart).Microseconds()) / 1000.0
 	insertStart := time.Now()
+
+	spanInsertSpan := traceway.StartSpan(c, "report.insert.spans")
+	err = telemetry.SpanRepository.InsertAsync(c, spansToInsert)
+	spanInsertSpan.End()
+
+	if err != nil {
+		c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting spansToInsert: %w", err))
+		return
+	}
 
 	if len(endpointsToInsert) > 0 {
 		insertSpan := traceway.StartSpan(c, "report.insert.endpoints")
@@ -350,15 +372,6 @@ func (e clientController) Report(c *gin.Context) {
 
 		metricNames := services.CollectUniqueMetricNames(metricPointsToInsert)
 		go services.AutoRegisterMetrics(projectId, metricNames)
-	}
-
-	spanInsertSpan := traceway.StartSpan(c, "report.insert.spans")
-	err = telemetry.SpanRepository.InsertAsync(c, spansToInsert)
-	spanInsertSpan.End()
-
-	if err != nil {
-		c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting spansToInsert: %w", err))
-		return
 	}
 
 	insertMs := float64(time.Since(insertStart).Microseconds()) / 1000.0

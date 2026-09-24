@@ -166,7 +166,11 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.POST("/ai-conversations/conversation", middleware.UseAppAuth, middleware.RequireProjectAccess, AiTraceController.GetConversationDetail)
 	router.POST("/ai-users/grouped", middleware.UseAppAuth, middleware.RequireProjectAccess, AiTraceController.FindAiUsers)
 
-	router.POST("/distributed-traces/:distributedTraceId", middleware.UseAppAuth, DistributedTraceController.GetDistributedTrace)
+	router.POST("/distributed-traces/:traceId", middleware.UseAppAuth, DistributedTraceController.GetDistributedTrace)
+	router.GET("/otel/spans/:traceId/:spanId", middleware.UseAppAuth, middleware.RequireProjectAccess, GetOtelSpan)
+	router.POST("/spans/search", middleware.UseAppAuth, middleware.RequireProjectAccess, SpanExplorerController.Search)
+	router.GET("/spans/traces/:traceId", middleware.UseAppAuth, middleware.RequireProjectAccess, SpanExplorerController.GetTrace)
+	router.GET("/spans/traces/:traceId/spans/:spanId/attributes", middleware.UseAppAuth, middleware.RequireProjectAccess, SpanExplorerController.GetSpanAttributes)
 
 	router.POST("/logs", middleware.UseAppAuth, middleware.RequireProjectAccess, LogController.List)
 
@@ -320,9 +324,6 @@ func RegisterControllers(router *gin.RouterGroup) {
 	// reads main DB + telemetry through its own short transactions).
 	router.GET("/status/:slug", middleware.RateLimitPerIP(30, time.Minute), StatusPageController.Public)
 	router.GET("/status/:slug/logo", middleware.RateLimitPerIP(60, time.Minute), StatusPageController.PublicLogo)
-	// Maps a CNAMEd vanity host to its status page slug (called by the SPA
-	// when an anonymous visitor lands on / of an unrecognized host).
-	router.GET("/status-domains/resolve", middleware.RateLimitPerIP(60, time.Minute), StatusPageController.ResolveHost)
 
 	router.GET("/organizations/:organizationId/teams", middleware.UseAppAuth, middleware.RequireOrganizationAccess, middleware.Transactional, TeamController.List)
 	router.POST("/organizations/:organizationId/teams", middleware.UseAppAuth, middleware.RequireAdminAccess, middleware.Transactional, TeamController.Create)

@@ -1,3 +1,5 @@
+> 🎉 **Traceway 2.0 is here.** More reliable traces, better OpenTelemetry compatibility, and a clearer picture of your app. [Read the V2 release post →](https://tracewayapp.com/blog/traceway-2-0)
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="Traceway%20Logo%20White.png" />
