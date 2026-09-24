@@ -2,7 +2,6 @@ package notifications
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -32,9 +31,7 @@ func sanitizeForDB(s string) string {
 // recorded here at enqueue time (the durable promise) so a rule cannot
 // re-fire while the outbox is still retrying.
 func dispatch(rule *models.NotificationRuleWithChannel, msg Message) bool {
-	channel, dbErr := db.ExecuteTransaction(func(tx *sql.Tx) (*models.NotificationChannel, error) {
-		return transactional.NotificationChannelRepository.FindById(tx, rule.ChannelId)
-	})
+	channel, dbErr := transactional.NotificationChannelRepository.FindById(db.DB, rule.ChannelId)
 	if dbErr != nil || channel == nil {
 		recordFiredNotification(rule, msg, "failed", "failed to load channel")
 		return false
@@ -72,17 +69,15 @@ func dispatch(rule *models.NotificationRuleWithChannel, msg Message) bool {
 
 	ruleId := rule.Id
 	projectId := rule.ProjectId
-	_, err := db.ExecuteTransaction(func(tx *sql.Tx) (int, error) {
-		return outbox.Enqueue(tx, outbox.Delivery{
-			Kind:        models.OutboxKindRule,
-			AdapterType: channel.ChannelType,
-			// Snapshot: later channel edits do not affect queued sends.
-			AdapterConfig: json.RawMessage(channel.Config),
-			Message:       msg,
-			RuleId:        &ruleId,
-			ProjectId:     &projectId,
-			ChannelName:   channel.Name,
-		})
+	_, err := outbox.Enqueue(db.DB, outbox.Delivery{
+		Kind:        models.OutboxKindRule,
+		AdapterType: channel.ChannelType,
+		// Snapshot: later channel edits do not affect queued sends.
+		AdapterConfig: json.RawMessage(channel.Config),
+		Message:       msg,
+		RuleId:        &ruleId,
+		ProjectId:     &projectId,
+		ChannelName:   channel.Name,
 	})
 	if err != nil {
 		// No outbox row exists, so the terminal hook can never record this

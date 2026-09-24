@@ -2,7 +2,6 @@ package notifications
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -33,9 +32,7 @@ func registerReportHook() {
 func evaluateEventRules(event hooks.ReportEvent) {
 	defer traceway.Recover()
 
-	rules, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.NotificationRuleWithChannel, error) {
-		return transactional.NotificationRuleRepository.FindEnabledEventRules(tx, event.ProjectId)
-	})
+	rules, err := transactional.NotificationRuleRepository.FindEnabledEventRules(db.DB, event.ProjectId)
 	if err != nil {
 		traceway.CaptureException(fmt.Errorf("failed to load event notification rules: %w", err))
 		return
@@ -296,9 +293,7 @@ func resolveTraceName(ctx context.Context, projectId uuid.UUID, traceId *uuid.UU
 }
 
 func getProjectName(projectId uuid.UUID) string {
-	project, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error) {
-		return transactional.ProjectRepository.FindById(tx, projectId)
-	})
+	project, err := transactional.ProjectRepository.FindById(db.DB, projectId)
 	if err != nil || project == nil {
 		return ""
 	}
