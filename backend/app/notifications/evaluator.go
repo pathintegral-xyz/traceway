@@ -2,7 +2,6 @@ package notifications
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -37,9 +36,7 @@ func seedCooldowns(ctx context.Context) {
 	// Backstop: fired_notifications rows only exist once an outcome is
 	// terminal, so a crash between enqueue and delivery would otherwise let
 	// the rule re-fire immediately at boot while its outbox row still exists.
-	enqueued, err := db.ExecuteTransaction(func(tx *sql.Tx) (map[int]time.Time, error) {
-		return transactional.OutboxRepository.LastEnqueuedPerRule(tx)
-	})
+	enqueued, err := transactional.OutboxRepository.LastEnqueuedPerRule(db.DB)
 	if err != nil {
 		traceway.CaptureException(fmt.Errorf("failed to seed notification cooldowns from outbox: %w", err))
 		return
@@ -64,9 +61,7 @@ func startPolledLoop(ctx context.Context) {
 }
 
 func evaluatePolledRules(ctx context.Context) {
-	rules, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.NotificationRuleWithChannel, error) {
-		return transactional.NotificationRuleRepository.FindEnabledPolledRules(tx)
-	})
+	rules, err := transactional.NotificationRuleRepository.FindEnabledPolledRules(db.DB)
 	if err != nil {
 		traceway.CaptureException(fmt.Errorf("failed to load polled notification rules: %w", err))
 		return

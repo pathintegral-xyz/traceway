@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tracewayapp/lit/v2"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories/transactional"
 )
@@ -29,10 +30,10 @@ type Delivery struct {
 	ChannelName        string
 }
 
-// Enqueue inserts a pending outbox row in the caller's transaction. The commit
-// of that transaction is the durable "someone will be notified" promise.
-// Callers should Wake() after their transaction commits.
-func Enqueue(tx *sql.Tx, d Delivery) (int, error) {
+// Enqueue inserts a pending outbox row. When called with a transaction, its
+// commit is the durable promise; a standalone insert is durable on success.
+// Callers should Wake() after that point.
+func Enqueue(tx lit.Executor, d Delivery) (int, error) {
 	messageJSON, err := json.Marshal(d.Message)
 	if err != nil {
 		return 0, err

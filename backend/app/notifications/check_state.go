@@ -1,7 +1,6 @@
 package notifications
 
 import (
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -30,9 +29,7 @@ func RegisterPageResolver(resolver PageResolver) {
 func OnCheckStateChange(transition synthetics.StateTransition) {
 	defer traceway.Recover()
 
-	rules, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.NotificationRuleWithChannel, error) {
-		return transactional.NotificationRuleRepository.FindEnabledEventRules(tx, transition.Check.ProjectId)
-	})
+	rules, err := transactional.NotificationRuleRepository.FindEnabledEventRules(db.DB, transition.Check.ProjectId)
 	if err != nil {
 		traceway.CaptureException(fmt.Errorf("failed to load event notification rules for check transition: %w", err))
 		return
