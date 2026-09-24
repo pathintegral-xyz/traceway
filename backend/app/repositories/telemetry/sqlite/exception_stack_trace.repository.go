@@ -112,7 +112,7 @@ func (e *exceptionStackTraceRepository) InsertAsync(ctx context.Context, lines [
 		for _, est := range lines {
 			row := exceptionToRow(est)
 			statements = append(statements, d1http.Statement{
-				SQL: "INSERT INTO exceptions_v2 (id, project_id, trace_id, span_id, trace_type, exception_hash, stack_trace, recorded_at, attributes, app_version, server_name, is_message, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				SQL:    "INSERT INTO exceptions_v2 (id, project_id, trace_id, span_id, trace_type, exception_hash, stack_trace, recorded_at, attributes, app_version, server_name, is_message, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 				Params: []any{row.Id, row.ProjectId, row.TraceId, row.SpanId, row.TraceType, row.ExceptionHash, row.StackTrace, row.RecordedAt, row.Attributes, row.AppVersion, row.ServerName, row.IsMessage, row.SessionId},
 			})
 		}

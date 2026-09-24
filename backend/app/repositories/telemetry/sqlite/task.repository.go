@@ -117,7 +117,7 @@ func (e *taskRepository) InsertAsync(ctx context.Context, lines []models.Task) e
 		for _, t := range lines {
 			row := taskToRow(t)
 			statements = append(statements, d1http.Statement{
-				SQL: "INSERT INTO tasks_v2 (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, trace_id, span_id, parent_span_id, is_root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				SQL:    "INSERT INTO tasks_v2 (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, trace_id, span_id, parent_span_id, is_root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 				Params: []any{row.Id, row.ProjectId, row.TaskName, row.Duration, row.RecordedAt, row.ClientIP, row.Attributes, row.AppVersion, row.ServerName, row.TraceId, row.SpanId, row.ParentSpanId, row.IsRoot},
 			})
 		}

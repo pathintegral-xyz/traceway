@@ -159,7 +159,7 @@ func (e *endpointRepository) InsertAsync(ctx context.Context, lines []models.End
 		for _, ep := range lines {
 			row := endpointToRow(ep)
 			statements = append(statements, d1http.Statement{
-				SQL: "INSERT INTO endpoints_v2 (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, trace_id, span_id, parent_span_id, is_stream, is_root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				SQL:    "INSERT INTO endpoints_v2 (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, trace_id, span_id, parent_span_id, is_stream, is_root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 				Params: []any{row.Id, row.ProjectId, row.Endpoint, row.Duration, row.RecordedAt, row.StatusCode, row.BodySize, row.ClientIP, row.Attributes, row.AppVersion, row.ServerName, row.TraceId, row.SpanId, row.ParentSpanId, row.IsStream, row.IsRoot},
 			})
 		}
