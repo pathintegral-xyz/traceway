@@ -58,6 +58,28 @@ func TestQueryUsesRawD1Rows(t *testing.T) {
 	}
 }
 
+func TestQueryScansNumericD1BooleansAndLargeIntegers(t *testing.T) {
+	db := newTestDB(t, func(w http.ResponseWriter, r *http.Request) {
+		response(w, map[string]any{
+			"success": true,
+			"meta":    map[string]any{"changes": 0, "last_row_id": "0"},
+			"results": map[string]any{
+				"columns": []string{"drop_healthy_healthchecks", "enabled", "id", "rate"},
+				"rows":    [][]any{{1, 0, int64(9007199254740993), 1.5}},
+			},
+		})
+	})
+	var enabled, disabled bool
+	var id int64
+	var rate float64
+	if err := db.QueryRow("SELECT drop_healthy_healthchecks, enabled, id, rate FROM projects").Scan(&enabled, &disabled, &id, &rate); err != nil {
+		t.Fatal(err)
+	}
+	if !enabled || disabled || id != 9007199254740993 || rate != 1.5 {
+		t.Fatalf("got enabled=%t disabled=%t id=%d rate=%v", enabled, disabled, id, rate)
+	}
+}
+
 func TestExecExposesD1MetadataAndFormatsTime(t *testing.T) {
 	now := time.Date(2026, 9, 16, 8, 0, 0, 123, time.UTC)
 	db := newTestDB(t, func(w http.ResponseWriter, r *http.Request) {
