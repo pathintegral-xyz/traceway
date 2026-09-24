@@ -76,6 +76,6 @@ func TestEnqueueStandaloneD1(t *testing.T) {
 		}
 	}
 	if !configFound {
-		t.Fatal("D1 insert did not receive JSON adapter config as text")
+		t.Fatalf("D1 insert did not receive JSON adapter config as text: sql=%q params=%#v", request.SQL, request.Params)
 	}
 }
