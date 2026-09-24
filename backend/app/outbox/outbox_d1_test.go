@@ -32,7 +32,7 @@ func TestEnqueueStandaloneD1(t *testing.T) {
 			"success": true,
 			"result": []any{map[string]any{
 				"success": true,
-				"meta": map[string]any{"changes": 1, "last_row_id": "17"},
+				"meta":    map[string]any{"changes": 1, "last_row_id": "17"},
 				"results": map[string]any{"columns": []string{}, "rows": [][]any{}},
 			}},
 		})
