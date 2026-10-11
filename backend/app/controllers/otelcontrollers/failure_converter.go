@@ -2,7 +2,6 @@ package otelcontrollers
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -28,10 +27,11 @@ func failedSpanExceptions(ctx context.Context, project *models.Project, projectI
 	for _, resource := range req.ResourceSpans {
 		for _, scope := range resource.ScopeSpans {
 			for _, span := range scope.Spans {
-				if len(span.TraceId) != 16 || len(span.SpanId) != 8 {
+				traceID := otelTraceIDToUUID(span.TraceId)
+				if traceID == uuid.Nil || otelSpanIDToUUID(span.SpanId) == uuid.Nil {
 					continue
 				}
-				key := hex.EncodeToString(span.TraceId)
+				key := traceID.String()
 				if spanCarriesException(span) {
 					explicit[key] = true
 				}
