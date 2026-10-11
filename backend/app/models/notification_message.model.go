@@ -28,7 +28,8 @@ type NotificationMessage struct {
 	// conditions). Page dedup keys are built from it — never from URL, which
 	// can embed a time window that changes every fire. Not persisted: dedup
 	// only matters at page-open time.
-	DedupToken string `json:"-"`
+	DedupToken      string `json:"-"`
+	IncidentTraceID string `json:"-"`
 }
 
 const (

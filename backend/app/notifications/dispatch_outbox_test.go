@@ -205,3 +205,21 @@ func TestDispatchDashboardLinks(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorRulesShareIncidentDedup(t *testing.T) {
+	fixture := setupDispatchDB(t)
+	msg := Message{Subject: "SQL failure", IncidentTraceID: "same-trace"}
+	if !dispatch(fixture.Rule, msg) {
+		t.Fatal("first dispatch failed")
+	}
+	fixture.Rule.Id++
+	fixture.Rule.RuleType = "error_regression"
+	msg.Subject = "HTTP 500 from same failure"
+	if !dispatch(fixture.Rule, msg) {
+		t.Fatal("duplicate dispatch should be accepted")
+	}
+	var count int
+	if err := db.DB.QueryRow("SELECT COUNT(*) FROM notification_outbox").Scan(&count); err != nil || count != 1 {
+		t.Fatalf("expected one alert across rules, got %d: %v", count, err)
+	}
+}

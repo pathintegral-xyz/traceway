@@ -105,11 +105,11 @@ func evaluateErrorRegression(ctx context.Context, rule *models.NotificationRuleW
 
 func getExceptionDetails(ctx context.Context, projectId uuid.UUID, hash string) ExceptionDetails {
 	var idStr, stackTrace, traceType, appVersion, serverName, attributesJSON, recordedAtStr string
-	var traceIdStr sql.NullString
+	var traceIdStr, distributedTraceIdStr sql.NullString
 
 	err := db.TelemetryDB.QueryRowContext(ctx,
-		"SELECT id, trace_id, trace_type, stack_trace, attributes, app_version, server_name, recorded_at FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? ORDER BY recorded_at DESC LIMIT 1",
-		projectId.String(), hash).Scan(&idStr, &traceIdStr, &traceType, &stackTrace, &attributesJSON, &appVersion, &serverName, &recordedAtStr)
+		"SELECT id, trace_id, distributed_trace_id, trace_type, stack_trace, attributes, app_version, server_name, recorded_at FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? ORDER BY recorded_at DESC LIMIT 1",
+		projectId.String(), hash).Scan(&idStr, &traceIdStr, &distributedTraceIdStr, &traceType, &stackTrace, &attributesJSON, &appVersion, &serverName, &recordedAtStr)
 
 	details := ExceptionDetails{
 		Hash: hash,
@@ -130,6 +130,11 @@ func getExceptionDetails(ctx context.Context, projectId uuid.UUID, hash string) 
 	details.ServerName = serverName
 	details.RecordedAt, _ = time.Parse(time.RFC3339Nano, recordedAtStr)
 	details.TraceType = traceType
+	if distributedTraceIdStr.Valid {
+		details.IncidentTraceID = distributedTraceIdStr.String
+	} else if traceIdStr.Valid {
+		details.IncidentTraceID = traceIdStr.String
+	}
 
 	var traceId *uuid.UUID
 	if traceIdStr.Valid {

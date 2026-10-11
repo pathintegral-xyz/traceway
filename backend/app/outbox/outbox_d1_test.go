@@ -85,3 +85,42 @@ func TestEnqueueStandaloneD1(t *testing.T) {
 		t.Fatal("D1 insert did not receive JSON message as text")
 	}
 }
+
+func TestIncidentEnqueueOnD1(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var request struct {
+			SQL    string `json:"sql"`
+			Params []any  `json:"params"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+		}
+		if !strings.Contains(request.SQL, "ON CONFLICT (incident_key)") {
+			t.Error("missing atomic incident constraint")
+		}
+		rows := [][]any{}
+		if calls == 1 {
+			rows = append(rows, []any{17})
+		}
+		json.NewEncoder(w).Encode(map[string]any{"success": true, "result": []any{map[string]any{"success": true, "results": map[string]any{"columns": []string{"id"}, "rows": rows}}}})
+	}))
+	defer server.Close()
+	conn, err := d1http.Open(d1http.Config{AccountID: "account", DatabaseID: "database", APIToken: "token", Endpoint: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	previousDB, previousDriver := db.DB, db.Driver
+	db.DB, db.Driver = conn, lit.SQLite
+	defer func() { db.DB, db.Driver = previousDB, previousDriver }()
+	projectID := uuid.New()
+	delivery := Delivery{Kind: "rule", AdapterType: "feishu", Message: models.NotificationMessage{Subject: "SQL failure"}, ProjectId: &projectID, IncidentKey: "project:channel:trace"}
+	if id, err := Enqueue(db.DB, delivery); id != 17 || err != nil {
+		t.Fatalf("first enqueue: %d %v", id, err)
+	}
+	if id, err := Enqueue(db.DB, delivery); id != 0 || err != nil {
+		t.Fatalf("duplicate enqueue: %d %v", id, err)
+	}
+}

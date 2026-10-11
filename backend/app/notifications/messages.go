@@ -367,16 +367,17 @@ func buildAiFlaggedContentMessage(conversationId, userId string, terms []string,
 }
 
 type ExceptionDetails struct {
-	Id         string
-	Hash       string
-	ErrorType  string
-	StackTrace string
-	Attributes map[string]string
-	AppVersion string
-	ServerName string
-	RecordedAt time.Time
-	TraceType  string
-	TraceName  string
+	IncidentTraceID string
+	Id              string
+	Hash            string
+	ErrorType       string
+	StackTrace      string
+	Attributes      map[string]string
+	AppVersion      string
+	ServerName      string
+	RecordedAt      time.Time
+	TraceType       string
+	TraceName       string
 }
 
 func (d ExceptionDetails) endpointForMessage() string {
@@ -388,25 +389,27 @@ func (d ExceptionDetails) endpointForMessage() string {
 
 func buildNewErrorMessage(details ExceptionDetails, projectName string) Message {
 	return Message{
-		Subject:    fmt.Sprintf("[%s] New error: %s", projectName, details.ErrorType),
-		Body:       buildExceptionBody("A new error has been detected: "+details.ErrorType, details),
-		Severity:   SeverityCritical,
-		URL:        fmt.Sprintf("/issues/%s", details.Hash),
-		Endpoint:   details.endpointForMessage(),
-		DedupToken: details.Hash,
-		Email:      exceptionEmail(models.EmailTemplateNewError, details, projectName),
+		Subject:         fmt.Sprintf("[%s] New error: %s", projectName, details.ErrorType),
+		Body:            buildExceptionBody("A new error has been detected: "+details.ErrorType, details),
+		Severity:        SeverityCritical,
+		URL:             fmt.Sprintf("/issues/%s", details.Hash),
+		Endpoint:        details.endpointForMessage(),
+		DedupToken:      details.Hash,
+		IncidentTraceID: details.IncidentTraceID,
+		Email:           exceptionEmail(models.EmailTemplateNewError, details, projectName),
 	}
 }
 
 func buildErrorRegressionMessage(details ExceptionDetails, projectName string) Message {
 	return Message{
-		Subject:    fmt.Sprintf("[%s] Resolved error reappeared: %s", projectName, details.ErrorType),
-		Body:       buildExceptionBody("A previously resolved error has reappeared: "+details.ErrorType, details),
-		Severity:   SeverityCritical,
-		URL:        fmt.Sprintf("/issues/%s", details.Hash),
-		Endpoint:   details.endpointForMessage(),
-		DedupToken: details.Hash,
-		Email:      exceptionEmail(models.EmailTemplateErrorRegression, details, projectName),
+		Subject:         fmt.Sprintf("[%s] Resolved error reappeared: %s", projectName, details.ErrorType),
+		Body:            buildExceptionBody("A previously resolved error has reappeared: "+details.ErrorType, details),
+		Severity:        SeverityCritical,
+		URL:             fmt.Sprintf("/issues/%s", details.Hash),
+		Endpoint:        details.endpointForMessage(),
+		DedupToken:      details.Hash,
+		IncidentTraceID: details.IncidentTraceID,
+		Email:           exceptionEmail(models.EmailTemplateErrorRegression, details, projectName),
 	}
 }
 

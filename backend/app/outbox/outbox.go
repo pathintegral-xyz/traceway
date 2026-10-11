@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 // re-derived at send time, so later channel/contact-method edits do not affect
 // rows already queued.
 type Delivery struct {
+	IncidentKey        string
 	Kind               string
 	AdapterType        string
 	AdapterConfig      json.RawMessage
@@ -47,6 +49,23 @@ func Enqueue(tx lit.Executor, d Delivery) (int, error) {
 	cfg := d.AdapterConfig
 	if len(cfg) == 0 {
 		cfg = json.RawMessage("{}")
+	}
+	if d.IncidentKey != "" {
+		query, args, err := lit.ParseNamedQuery(db.Driver,
+			`INSERT INTO notification_outbox (kind, status, adapter_type, adapter_config, message, attempts, next_attempt_at, cancel_key, page_notification_id, rule_id, project_id, channel_name, last_error, created_at, incident_key)
+            VALUES (:kind, 'pending', :adapter_type, :adapter_config, :message, 0, :next_attempt_at, :cancel_key, :page_id, :rule_id, :project_id, :channel_name, '', :created_at, :incident_key)
+            ON CONFLICT (incident_key) WHERE incident_key <> '' DO NOTHING RETURNING id`,
+			lit.P{"kind": d.Kind, "adapter_type": d.AdapterType, "adapter_config": string(cfg), "message": string(messageJSON), "next_attempt_at": next,
+				"cancel_key": d.CancelKey, "page_id": d.PageNotificationId, "rule_id": d.RuleId, "project_id": d.ProjectId, "channel_name": d.ChannelName, "created_at": now, "incident_key": d.IncidentKey})
+		if err != nil {
+			return 0, err
+		}
+		var id int
+		err = tx.QueryRow(query, args...).Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return id, err
 	}
 	if db.IsCloudflare() {
 		var pageNotificationID, ruleID, projectID any
