@@ -223,7 +223,6 @@ func (p projectController) CreateProject(c *gin.Context) {
 	c.JSON(http.StatusCreated, projectWithUrl)
 }
 
-
 func (p projectController) UpdateProject(c *gin.Context) {
 	var request UpdateProjectRequest
 	if err := c.ShouldBindJSON(&request); err != nil {

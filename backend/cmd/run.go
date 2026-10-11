@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html"
 	"io/fs"
 	"net"
 	"net/http"
@@ -35,7 +37,6 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/synthetics"
 	"github.com/tracewayapp/traceway/backend/static"
 
-	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	traceway "go.tracewayapp.com"
@@ -329,7 +330,7 @@ func Run(opts ...Option) {
 		}(listener)
 	}
 
-	notifySystemd()
+	notifySystemd(ctx)
 	config.Logln("Starting server on " + listeners[0].Addr().String())
 	serveHTTP(router, listeners[0])
 }
@@ -509,25 +510,6 @@ func parsePositiveInt(s string, def int) int {
 	return v
 }
 
-func notifySystemd() {
-	sent, err := daemon.SdNotify(false, daemon.SdNotifyReady)
-	if err != nil {
-		config.Logf("Failed to notify systemd: %v", err)
-	} else if sent {
-		config.Logln("Notified systemd that service is ready")
-	}
-
-	go func() {
-		defer traceway.Recover()
-
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			daemon.SdNotify(false, daemon.SdNotifyWatchdog)
-		}
-	}()
-}
-
 func mustSubFS(fsys fs.FS, dir string) fs.FS {
 	sub, err := fs.Sub(fsys, dir)
 	if err != nil {
@@ -582,18 +564,50 @@ func createSPAHandler(staticFS fs.FS) gin.HandlerFunc {
 		}
 
 		cleanPath := strings.TrimPrefix(path, "/")
-		if cleanPath != "" {
+		isPage := cleanPath == "" || strings.HasSuffix(cleanPath, ".html")
+		if !isPage {
 			if data, err := fs.ReadFile(staticFS, cleanPath); err == nil {
-				contentType := detectContentType(cleanPath)
-				c.Data(200, contentType, data)
+				c.Data(200, detectContentType(cleanPath), data)
 				return
 			}
+		}
+
+		statusPage, err := controllers.StatusPageForHost(c.Request.Host)
+		if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to resolve status page host: %w", err))
+			return
+		}
+
+		if statusPage == nil && cleanPath != "" && isPage {
+			if data, err := fs.ReadFile(staticFS, cleanPath); err == nil {
+				c.Data(200, detectContentType(cleanPath), data)
+				return
+			}
+		}
+
+		if statusPage != nil && path != "/" {
+			c.Redirect(http.StatusFound, "/")
+			return
 		}
 
 		indexData, err := fs.ReadFile(staticFS, "index.html")
 		if err != nil {
 			c.JSON(404, gin.H{"error": "Not found"})
 			return
+		}
+		if statusPage != nil {
+			title := html.EscapeString(statusPage.Name + " status")
+			head := `<meta name="traceway-status-slug" content="` + html.EscapeString(statusPage.Slug) + `">` +
+				`<meta property="og:title" content="` + title + `">`
+			if statusPage.Description != "" {
+				description := html.EscapeString(statusPage.Description)
+				head += `<meta name="description" content="` + description + `">` +
+					`<meta property="og:description" content="` + description + `">`
+			}
+			indexData = bytes.Replace(indexData, []byte("<title>Traceway</title>"), []byte("<title>"+title+"</title>"), 1)
+			indexData = bytes.Replace(indexData, []byte("</head>"), []byte(head+"</head>"), 1)
+			c.Header("Content-Security-Policy", "base-uri 'self'; form-action 'self'")
+			c.Writer.Header().Del("X-Frame-Options")
 		}
 		c.Data(200, "text/html; charset=utf-8", indexData)
 	}

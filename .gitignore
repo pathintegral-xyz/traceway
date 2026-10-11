@@ -52,6 +52,8 @@ backend/static/dist/
 /examples/hono-otel/node_modules
 /examples/nestjs-otel/node_modules
 /website/.wrangler
+/testing/devtesting/devtesting
+/testing/profiles-e2e/ingest/profiles-e2e-ingest
 
 # Benchmark tooling: built binaries and runner-only scratch dirs. The
 # committed result dirs are benchmarks/results-throughput/ and

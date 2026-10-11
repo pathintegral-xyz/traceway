@@ -3,7 +3,6 @@
 package pg
 
 import (
-
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/models"
 

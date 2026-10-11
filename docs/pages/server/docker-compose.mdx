@@ -16,15 +16,15 @@ services:
       CLICKHOUSE_SERVER: "clickhouse:9000"
       CLICKHOUSE_DATABASE: "traceway"
       CLICKHOUSE_USERNAME: "default"
-      CLICKHOUSE_PASSWORD: "clickhouse"
+      CLICKHOUSE_PASSWORD: clickhouse
       CLICKHOUSE_TLS: "false"
       POSTGRES_HOST: "postgres"
       POSTGRES_PORT: "5432"
       POSTGRES_DATABASE: "traceway"
       POSTGRES_USERNAME: "traceway"
-      POSTGRES_PASSWORD: "traceway"
+      POSTGRES_PASSWORD: traceway
       POSTGRES_SSLMODE: "disable"
-      JWT_SECRET: "change-this-to-a-secure-secret-at-least-32-chars"
+      JWT_SECRET: change-this-to-a-secure-secret-at-least-32-chars
     volumes:
       - traceway-storage:/app/storage
     depends_on:

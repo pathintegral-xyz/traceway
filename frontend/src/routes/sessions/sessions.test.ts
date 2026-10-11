@@ -36,8 +36,11 @@ beforeEach(() => {
 		pagination: { total: 1, totalPages: 1 }
 	});
 });
-afterEach(() => {
+afterEach(async () => {
 	cleanup();
+	// bits-ui resets the body scroll lock 24ms after a dialog unmounts; if jsdom is torn
+	// down first, that timer throws "document is not defined".
+	await new Promise((resolve) => setTimeout(resolve, 50));
 	vi.clearAllMocks();
 	if (scrollIntoViewDescriptor) {
 		Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', scrollIntoViewDescriptor);

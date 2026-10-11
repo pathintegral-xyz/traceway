@@ -12,4 +12,5 @@ test('upstream SQLite schemas and D1 transaction boundaries', async () => {
   assert.equal(result.interactiveTransactions, 'unsupported');
   assert.equal(result.failedBatchRollback, 'passed');
   assert.equal(result.batchReadOwnWrites, 'passed');
+  assert.equal(result.binarySpanPayload, 'passed');
 });

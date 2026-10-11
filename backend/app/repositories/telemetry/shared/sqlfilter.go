@@ -11,9 +11,9 @@ import (
 func RootFilterClause(qualifiedCol, rootFilter string) string {
 	switch rootFilter {
 	case "root":
-		return " AND " + qualifiedCol + " IN (1, 'true')"
+		return " AND CAST(" + qualifiedCol + " AS TEXT) IN ('1', 'true')"
 	case "non_root":
-		return " AND " + qualifiedCol + " IN (0, 'false')"
+		return " AND CAST(" + qualifiedCol + " AS TEXT) IN ('0', 'false')"
 	default:
 		return ""
 	}
@@ -41,4 +41,16 @@ func SortedKeys(m map[string]string) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// TraceIdsFilter matches the supplied trace IDs and writes its named parameters into params.
+func TraceIdsFilter(traceIds []string, params map[string]any) string {
+	names := make([]string, len(traceIds))
+	for i, id := range traceIds {
+		key := fmt.Sprintf("trace_%d", i)
+		names[i] = ":" + key
+		params[key] = id
+	}
+	list := strings.Join(names, ",")
+	return "trace_id IN (" + list + ")"
 }

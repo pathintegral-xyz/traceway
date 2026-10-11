@@ -48,6 +48,13 @@ export async function probeD1() {
     ]);
     assert.equal(batch[1].results[0].value, 'first');
     results.batchReadOwnWrites = 'passed';
+
+    const telemetry = await runtime.getD1Database('TELEMETRY');
+    await telemetry.batch([
+      telemetry.prepare("INSERT INTO spans_v2 (project_id, recorded_at, otlp) VALUES ('probe', '2026-09-24T00:00:00Z', X'00FF12')"),
+    ]);
+    assert.equal(await telemetry.prepare("SELECT hex(otlp) AS payload FROM spans_v2 WHERE project_id = 'probe'").first('payload'), '00FF12');
+    results.binarySpanPayload = 'passed';
     return results;
   } finally {
     await runtime.dispose();
