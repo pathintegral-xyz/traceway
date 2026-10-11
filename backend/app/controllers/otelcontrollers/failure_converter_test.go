@@ -2,9 +2,12 @@ package otelcontrollers
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 	"strings"
 	"testing"
 	"time"
@@ -66,5 +69,42 @@ func TestFailureSignalsPreferRootCauseAcrossResources(t *testing.T) {
 	sql.Events = []*tracepb.Span_Event{{Name: "exception", TimeUnixNano: sql.StartTimeUnixNano, Attributes: []*commonpb.KeyValue{strKV("exception.type", "ConstraintError")}}}
 	if got := failedSpanExceptions(context.Background(), nil, testProjectId, req); len(got) != 0 {
 		t.Fatalf("real exception must suppress synthetic failures: %+v", got)
+	}
+}
+
+func TestFailureSignalsFromOTLPJSON(t *testing.T) {
+	for _, signal := range []string{"sql", "http"} {
+		t.Run(signal, func(t *testing.T) {
+			span := failureTestSpan(1)
+			if signal == "sql" {
+				span.Status = &tracepb.Status{Code: tracepb.Status_STATUS_CODE_ERROR}
+				span.Attributes = []*commonpb.KeyValue{strKV("db.system.name", "sqlite")}
+			} else {
+				span.Attributes = []*commonpb.KeyValue{intKV("http.response.status_code", 500)}
+			}
+			payload, err := protojson.Marshal(failureTestRequest(span))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var wire map[string]any
+			if err := json.Unmarshal(payload, &wire); err != nil {
+				t.Fatal(err)
+			}
+			wireSpan := wire["resourceSpans"].([]any)[0].(map[string]any)["scopeSpans"].([]any)[0].(map[string]any)["spans"].([]any)[0].(map[string]any)
+			wireSpan["traceId"] = hex.EncodeToString(span.TraceId)
+			wireSpan["spanId"] = hex.EncodeToString(span.SpanId)
+			payload, err = json.Marshal(wire)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := &coltracepb.ExportTraceServiceRequest{}
+			if err := protojson.Unmarshal(payload, req); err != nil {
+				t.Fatal(err)
+			}
+			_, _, _, exceptions, _, _ := convertTraces(context.Background(), nil, testProjectId, req)
+			if len(exceptions) != 1 || exceptions[0].DistributedTraceId == nil || *exceptions[0].DistributedTraceId != otelTraceIDToUUID(span.TraceId) {
+				t.Fatalf("JSON %s failure not captured with its original trace ID: %+v", signal, exceptions)
+			}
+		})
 	}
 }
