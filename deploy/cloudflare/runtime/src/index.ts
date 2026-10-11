@@ -12,6 +12,7 @@ export interface Env {
 	S3_BUCKET: string;
 	S3_ENDPOINT: string;
 	APP_BASE_URL: string;
+	SQLITE_RETENTION_DAYS?: string;
 }
 
 export class TracewayContainer extends Container {
@@ -45,6 +46,7 @@ function runtimeEnv(env: Env): Record<string, string> {
 		S3_SECRET_KEY: env.S3_SECRET_KEY,
 		APP_BASE_URL: env.APP_BASE_URL,
 		CLOUD_MODE: 'true',
+		SQLITE_RETENTION_DAYS: env.SQLITE_RETENTION_DAYS ?? '30',
 		TRUSTED_PROXY_HEADER: 'CF-Connecting-IP',
 		PORTS: '8082'
 	};

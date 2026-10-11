@@ -30,7 +30,8 @@ config.vars = {
 	CLOUDFLARE_D1_TELEMETRY_DATABASE_ID: process.env.TRACEWAY_TELEMETRY_D1_DATABASE_ID,
 	S3_BUCKET: process.env.TRACEWAY_R2_BUCKET,
 	S3_ENDPOINT: `https://${accountId}.r2.cloudflarestorage.com`,
-	APP_BASE_URL: process.env.TRACEWAY_APP_BASE_URL
+	APP_BASE_URL: process.env.TRACEWAY_APP_BASE_URL,
+	SQLITE_RETENTION_DAYS: process.env.SQLITE_RETENTION_DAYS || '30'
 };
 
 await writeFile('runtime/wrangler.generated.jsonc', `${JSON.stringify(config, null, 2)}\n`);

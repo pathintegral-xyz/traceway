@@ -14,3 +14,13 @@ The Worker passes its secrets into each stateless Go Container only when it star
 6. Ensure a local Docker-compatible daemon is running before `wrangler deploy`; Cloudflare builds and pushes the image from the Dockerfile during deployment.
 
 Do not create production resources from this template. Production receives a separately copied configuration, separate D1 databases, separate R2 bucket and credentials, and a promotion only after the remote stage acceptance slice passes.
+
+## Telemetry retention
+
+The Worker forwards `SQLITE_RETENTION_DAYS` into the Go Container on startup.
+Both Stage and Prod workflows set it to `3`.
+The deployment config generator includes the value so a later deployment does not silently reset it.
+After changing this variable, restart the container with its existing image/configuration so the process reads the new value.
+The existing retention worker runs at startup and hourly; it prunes telemetry older than the configured period.
+For a full D1 database, clear old telemetry in bounded batches before restarting to avoid a large startup delete exceeding D1 query limits.
+Production uses the existing main and telemetry D1 databases; this setting does not delete projects, organization configuration, or application business data.
