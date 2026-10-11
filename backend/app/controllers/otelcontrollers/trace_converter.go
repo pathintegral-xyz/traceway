@@ -332,6 +332,7 @@ func convertTraces(ctx context.Context, existingProject *models.Project, project
 			}
 		}
 	}
+	exceptions = append(exceptions, failedSpanExceptions(ctx, existingProject, projectId, req)...)
 	return
 }
 

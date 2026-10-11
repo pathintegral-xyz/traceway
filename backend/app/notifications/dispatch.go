@@ -69,7 +69,12 @@ func dispatch(rule *models.NotificationRuleWithChannel, msg Message) bool {
 
 	ruleId := rule.Id
 	projectId := rule.ProjectId
-	_, err := outbox.Enqueue(db.DB, outbox.Delivery{
+	incidentKey := ""
+	if msg.IncidentTraceID != "" && (rule.RuleType == "new_error" || rule.RuleType == "error_regression") {
+		incidentKey = fmt.Sprintf("%s:%d:%s", rule.ProjectId, channel.Id, msg.IncidentTraceID)
+	}
+	deliveryID, err := outbox.Enqueue(db.DB, outbox.Delivery{
+		IncidentKey: incidentKey,
 		Kind:        models.OutboxKindRule,
 		AdapterType: channel.ChannelType,
 		// Snapshot: later channel edits do not affect queued sends.
@@ -88,6 +93,9 @@ func dispatch(rule *models.NotificationRuleWithChannel, msg Message) bool {
 		return false
 	}
 
+	if deliveryID == 0 {
+		return true
+	}
 	cooldowns.recordFire(rule.Id)
 	outbox.Wake()
 	return true

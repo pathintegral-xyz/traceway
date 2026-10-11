@@ -52,7 +52,9 @@ jobs:
         with:
           go-version-file: backend/go.mod
       - run: go test ./app/db/d1http
-      - run: go test -tags cloudflare ./app/outbox -run '^TestEnqueueStandaloneD1$' -count=1
+      - run: go test ./app/controllers/otelcontrollers ./app/outbox ./app/notifications -count=1
+      - run: go test -race ./app/outbox -run TestIncidentEnqueueIsAtomicAndPersistsAcrossDelivery -count=1
+      - run: go test -tags cloudflare ./app/outbox -run '^Test(EnqueueStandaloneD1|IncidentEnqueueOnD1)$' -count=1
 
   cloudflare-build:
     name: Cloudflare server build
