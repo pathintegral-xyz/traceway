@@ -190,17 +190,18 @@ func TestDispatchDashboardLinks(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fixture := setupDispatchDB(t)
 			setAppBaseURL(t, tc.base)
+			want := tc.want + "?projectId=" + fixture.Rule.ProjectId.String()
 
 			details := ExceptionDetails{Hash: "0123456789abcdef", ErrorType: "RuntimeError"}
 			if !dispatch(fixture.Rule, buildNewErrorMessage(details, "api")) {
 				t.Fatal("dispatch failed")
 			}
 			msg := queuedMessage(t)
-			if msg.URL != tc.want {
-				t.Errorf("URL = %q, want %q", msg.URL, tc.want)
+			if msg.URL != want {
+				t.Errorf("URL = %q, want %q", msg.URL, want)
 			}
-			if !strings.Contains(msg.Body, "View details: "+tc.want) {
-				t.Errorf("body lacks %q:\n%s", tc.want, msg.Body)
+			if !strings.Contains(msg.Body, "View details: "+want) {
+				t.Errorf("body lacks %q:\n%s", want, msg.Body)
 			}
 		})
 	}
