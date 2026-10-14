@@ -45,7 +45,11 @@ func dispatch(rule *models.NotificationRuleWithChannel, msg Message) bool {
 	if rule.Severity != "" {
 		msg.Severity = Severity(rule.Severity)
 	}
-	msg.URL = dashboardURL(msg.URL)
+	detailsLink := "\n\nView details: " + dashboardURL(msg.URL)
+	msg.URL = projectDashboardURL(msg.URL, rule.ProjectId)
+	if strings.HasSuffix(msg.Body, detailsLink) {
+		msg.Body = strings.TrimSuffix(msg.Body, detailsLink) + "\n\nView details: " + msg.URL
+	}
 
 	// Escalation channels do not send anything themselves: they open (or
 	// dedup into) an on-call page, and the escalator + outbox do all

@@ -3,8 +3,8 @@ import { authState } from '$lib/state/auth.svelte';
 import { statusDomainSlug } from '$lib/status-domain';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = () => {
+export const load: PageLoad = ({ url }) => {
 	if (!authState.isAuthenticated && !statusDomainSlug) {
-		throw redirect(302, '/login');
+		throw redirect(302, `/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
 	}
 };

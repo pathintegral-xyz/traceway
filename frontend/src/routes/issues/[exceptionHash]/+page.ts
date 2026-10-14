@@ -4,9 +4,9 @@ import type { PageLoad } from './$types';
 
 export const prerender = false;
 
-export const load: PageLoad = ({ params }) => {
+export const load: PageLoad = ({ params, url }) => {
 	if (!authState.isAuthenticated) {
-		throw redirect(302, '/login');
+		throw redirect(302, `/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
 	}
 	return {
 		exceptionHash: params.exceptionHash

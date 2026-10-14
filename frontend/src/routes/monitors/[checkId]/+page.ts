@@ -16,7 +16,8 @@ export const load: PageLoad = ({ params, url }) => {
 	if (params.checkId === 'post-mortems') {
 		throw redirect(301, '/monitors?tab=post-mortems');
 	}
-	if (!authState.isAuthenticated) throw redirect(302, '/login');
+	if (!authState.isAuthenticated)
+		throw redirect(302, `/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
 	return {
 		checkId: params.checkId,
 		preset: url.searchParams.get('preset'),

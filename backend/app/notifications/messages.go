@@ -2,10 +2,12 @@ package notifications
 
 import (
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tracewayapp/traceway/backend/app/config"
 	"github.com/tracewayapp/traceway/backend/app/models"
 )
@@ -20,6 +22,20 @@ func dashboardURL(path string) string {
 		return path
 	}
 	return base + path
+}
+
+func projectDashboardURL(path string, projectId uuid.UUID) string {
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") {
+		return dashboardURL(path)
+	}
+	u, err := url.Parse(path)
+	if err != nil {
+		return dashboardURL(path)
+	}
+	query := u.Query()
+	query.Set("projectId", projectId.String())
+	u.RawQuery = query.Encode()
+	return dashboardURL(u.String())
 }
 
 func alertEmail(alert models.EmailAlert) *models.NotificationEmail {
